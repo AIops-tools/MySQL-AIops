@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mysql_aiops.ops._util import human_bytes, opt, s
+from mysql_aiops.ops._util import as_int, human_bytes, opt, s
 
 _DATABASES_SQL = """
 SELECT t.table_schema AS name,
@@ -85,10 +85,10 @@ def list_databases(conn: Any) -> list[dict]:
     return [
         {
             "name": opt(r.get("name"), 128),
-            "tableCount": r.get("table_count"),
-            "dataBytes": r.get("data_bytes"),
-            "indexBytes": r.get("index_bytes"),
-            "totalBytes": r.get("total_bytes"),
+            "tableCount": as_int(r.get("table_count")),
+            "dataBytes": as_int(r.get("data_bytes")),
+            "indexBytes": as_int(r.get("index_bytes")),
+            "totalBytes": as_int(r.get("total_bytes")),
             "totalPretty": human_bytes(r.get("total_bytes")),
         }
         for r in rows

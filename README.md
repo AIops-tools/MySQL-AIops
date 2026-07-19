@@ -181,14 +181,17 @@ PR** — contributions welcome. 缺功能提 issue/PR 欢迎留言。
 
 ## Verification status
 
-**Mock-validated; not yet exercised against a live server.** Every module imports,
-every MCP tool carries the governance marker, the four flagship analyses are unit-tested
-against synthetic records, and reversible writes are asserted to record the correct
-inverse undo descriptor — but the catalog queries are modelled from the documented
-`information_schema` / `performance_schema` shapes for MySQL 8.x and MariaDB 10.6+ and
-have not been run against a real server.
+**Live-verified against MySQL 8.4.10 (2026-07-19); MariaDB still mock-only.**
+Connectivity, the reads, `analyze slow-query` on genuine full scans, and the full
+governance loop (real `create_index` → audit row → undo actually dropping it) were
+exercised against a real server, as was read-only mode. That run found and fixed a
+real bug the mock suite could not see: `SUM()` aggregates come back as `Decimal`,
+which is not JSON serializable.
 
-[docs/VERIFICATION.md](docs/VERIFICATION.md) is the checklist a live run must satisfy.
-`mysql-aiops doctor` is the fastest live check (connectivity, flavor,
-performance_schema, replica role). MySQL and MariaDB are both free and trivially
-containerised, so a local run is cheap.
+The **MariaDB flavor branch** (`SHOW SLAVE STATUS`,
+`information_schema.innodb_lock_waits`), replication against a real replica, and
+lock-wait contention remain unverified.
+
+[docs/VERIFICATION.md](docs/VERIFICATION.md) records exactly what was checked and what
+is still open. `mysql-aiops doctor` is the fastest live check (connectivity, flavor,
+performance_schema, replica role).

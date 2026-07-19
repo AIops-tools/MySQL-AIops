@@ -6,6 +6,9 @@ rollups, flavor branching and summaries are exercised without a live server.
 
 from __future__ import annotations
 
+import json
+from decimal import Decimal
+
 import pytest
 
 from mysql_aiops.ops import (
@@ -17,6 +20,7 @@ from mysql_aiops.ops import (
     server,
     tables,
 )
+from mysql_aiops.ops._util import as_int
 from tests.conftest import FakeMySQL
 
 
@@ -50,6 +54,32 @@ def test_list_databases_sorted_with_pretty_size():
     ]})
     out = server.list_databases(conn)
     assert out[0]["totalPretty"] == "1.0 MB"
+
+
+@pytest.mark.unit
+def test_list_databases_json_serializable_with_decimal_aggregates():
+    """Regression: a live server returns SUM() as Decimal, which json cannot encode.
+
+    Found only by running against a real MySQL 8.4 — the earlier fixture used
+    plain ints, so the mock suite could not see it. Model the driver's real
+    types here or this bug class comes straight back.
+    """
+    conn = FakeMySQL({"FROM information_schema.tables": [
+        {"name": "shop", "table_count": Decimal("12"), "data_bytes": Decimal("524288"),
+         "index_bytes": Decimal("524288"), "total_bytes": Decimal("1048576")},
+    ]})
+    out = server.list_databases(conn)
+    json.dumps(out)  # must not raise TypeError
+    assert out[0]["totalBytes"] == 1048576
+    assert isinstance(out[0]["totalBytes"], int)
+
+
+@pytest.mark.unit
+def test_as_int_keeps_absent_absent():
+    """A missing count must stay null, not silently become 0."""
+    assert as_int(None) is None
+    assert as_int(Decimal("7")) == 7
+    assert as_int("nonsense") is None
 
 
 @pytest.mark.unit

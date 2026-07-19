@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mysql-aiops"
-version = "0.2.0"
+version = "0.2.1"
 description = "Governed AI-ops for MySQL/MariaDB DBA operations: slow-query RCA, InnoDB lock-wait & deadlock analysis, replication-lag RCA and fragmentation analysis with a built-in governance harness (audit, budget, undo, risk tiers)"
 readme = "README.md"
 license = "MIT"

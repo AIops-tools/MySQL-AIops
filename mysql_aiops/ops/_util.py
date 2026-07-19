@@ -63,6 +63,28 @@ def opt(value: Any, limit: int = 200) -> str | None:
     return opt_str(value, limit)
 
 
+def as_int(value: Any) -> int | None:
+    """Coerce a numeric result-row value to ``int``, preserving absence.
+
+    MySQL returns aggregates (``SUM()``, ``AVG()``, ``COUNT()`` over a join) as
+    ``decimal.Decimal``, while a plain BIGINT column comes back as ``int``. A
+    ``Decimal`` is **not JSON serializable**, so any payload built straight from
+    an aggregate row raises ``TypeError`` at render time — a failure the mock
+    suite cannot see, because mocks hand back plain ints. Route every numeric
+    aggregate through here.
+
+    Absent stays absent (``None``) rather than becoming ``0``: an unknown count
+    and a zero count are different facts, and collapsing them is exactly the
+    misreporting the return contract exists to prevent.
+    """
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def quote_ident(part: str) -> str:
     """Validate a single identifier component and return it backtick-quoted.
 

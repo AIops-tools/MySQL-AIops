@@ -1,23 +1,24 @@
-# Release notes — mysql-aiops 0.2.1
+# Release notes — mysql-aiops 0.2.2
 
-Previous release: 0.2.0.
+Previous release: 0.2.1.
 
-## Fixed: `server databases` crashed against a real server
+## Live-verified: MariaDB
 
-`SUM()` aggregates come back from MySQL as `decimal.Decimal`, which `json` cannot
-encode — so `server databases` raised
-`TypeError: Object of type Decimal is not JSON serializable` on every live server.
-The mock suite could not see this: its fixtures returned plain ints.
+No behaviour changes. The MariaDB flavor branch was the largest verification debt in
+this repo and had never been run against a live server. It has now been exercised
+against **MariaDB 11.8.8**:
 
-Numeric aggregates now go through a shared `as_int()` helper, and the regression test
-models the driver's real types. Absent stays `None` rather than becoming `0` — an
-unknown count and a zero count are different facts.
+- Flavor correctly detected as `mariadb`; the MariaDB-specific paths
+  (`SHOW SLAVE STATUS`, `information_schema.innodb_lock_waits`) execute and return
+  well-shaped data.
+- **`analyze lock-waits` on real contention**: with two transactions deliberately
+  fighting over one row, it correctly identified the root blocker (the session
+  holding locks while waiting on nobody), the blocked session, an 18-second measured
+  wait, and named the exact tools to resolve it.
+- With `performance_schema = OFF`, `doctor` reports it as a limitation and says how
+  to enable it — no driver traceback, exactly as the checklist requires.
+- All 16 commands return well-formed JSON, including the `Decimal` aggregate path
+  fixed in 0.2.1.
 
-## Live-verified
-
-This release was exercised end-to-end against a real **MySQL 8.4.10** server: reads
-cross-checked against the `mysql` client, `analyze slow-query` on genuine full scans,
-the full governance loop (real `create_index` → audit row → `undo_apply` actually
-dropping it), and both layers of read-only mode. See
-[docs/VERIFICATION.md](docs/VERIFICATION.md) for what is confirmed and what is still
-open — **MariaDB remains mock-only** and is now the largest gap in this repo.
+See [docs/VERIFICATION.md](docs/VERIFICATION.md). Replication against a real replica
+remains unverified.

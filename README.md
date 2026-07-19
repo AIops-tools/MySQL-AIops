@@ -181,16 +181,16 @@ PR** — contributions welcome. 缺功能提 issue/PR 欢迎留言。
 
 ## Verification status
 
-**Live-verified against MySQL 8.4.10 (2026-07-19); MariaDB still mock-only.**
+**Live-verified against MySQL 8.4.10 and MariaDB 11.8.8 (2026-07-19/20).**
 Connectivity, the reads, `analyze slow-query` on genuine full scans, and the full
 governance loop (real `create_index` → audit row → undo actually dropping it) were
 exercised against a real server, as was read-only mode. That run found and fixed a
 real bug the mock suite could not see: `SUM()` aggregates come back as `Decimal`,
 which is not JSON serializable.
 
-The **MariaDB flavor branch** (`SHOW SLAVE STATUS`,
-`information_schema.innodb_lock_waits`), replication against a real replica, and
-lock-wait contention remain unverified.
+The MariaDB branch is now verified too, including `analyze lock-waits` against real
+row contention (it correctly identified the root blocker and the measured wait).
+**Replication against a real replica** remains unverified.
 
 [docs/VERIFICATION.md](docs/VERIFICATION.md) records exactly what was checked and what
 is still open. `mysql-aiops doctor` is the fastest live check (connectivity, flavor,

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mysql_aiops.ops._util import s
+from mysql_aiops.ops._util import opt
 
 _PROCESSLIST_SQL = """
 SELECT id,
@@ -104,13 +104,13 @@ ORDER BY trx_started ASC
 def _session_row(r: dict) -> dict:
     return {
         "id": r.get("id"),
-        "user": s(r.get("user"), 128),
-        "host": s(r.get("host"), 128),
-        "database": s(r.get("db"), 128),
-        "command": s(r.get("command"), 64),
+        "user": opt(r.get("user"), 128),
+        "host": opt(r.get("host"), 128),
+        "database": opt(r.get("db"), 128),
+        "command": opt(r.get("command"), 64),
         "ageSeconds": r.get("age_seconds"),
-        "state": s(r.get("state"), 128),
-        "query": s(r.get("query"), 500),
+        "state": opt(r.get("state"), 128),
+        "query": opt(r.get("query"), 500),
     }
 
 
@@ -142,12 +142,12 @@ def long_running_queries(conn: Any, min_seconds: int = 60) -> dict:
     queries = [
         {
             "id": r.get("id"),
-            "user": s(r.get("user"), 128),
-            "database": s(r.get("db"), 128),
-            "command": s(r.get("command"), 64),
+            "user": opt(r.get("user"), 128),
+            "database": opt(r.get("db"), 128),
+            "command": opt(r.get("command"), 64),
             "durationSeconds": r.get("duration_seconds"),
-            "state": s(r.get("state"), 128),
-            "query": s(r.get("query"), 500),
+            "state": opt(r.get("state"), 128),
+            "query": opt(r.get("query"), 500),
         }
         for r in rows
     ]
@@ -163,14 +163,14 @@ def list_transactions(conn: Any) -> dict:
     rows = conn.query(_TRX_SQL)
     transactions = [
         {
-            "trxId": s(r.get("trx_id"), 32),
+            "trxId": opt(r.get("trx_id"), 32),
             "threadId": r.get("thread_id"),
-            "state": s(r.get("trx_state"), 32),
-            "started": s(r.get("trx_started"), 64),
+            "state": opt(r.get("trx_state"), 32),
+            "started": opt(r.get("trx_started"), 64),
             "ageSeconds": r.get("age_seconds"),
             "rowsLocked": r.get("trx_rows_locked"),
             "rowsModified": r.get("trx_rows_modified"),
-            "query": s(r.get("query"), 300),
+            "query": opt(r.get("query"), 300),
         }
         for r in rows
     ]
@@ -195,15 +195,15 @@ def lock_wait_pairs(conn: Any) -> list[dict]:
     return [
         {
             "blockedId": r.get("blocked_id"),
-            "blockedTrx": s(r.get("blocked_trx"), 32),
-            "blockedQuery": s(r.get("blocked_query"), 300),
+            "blockedTrx": opt(r.get("blocked_trx"), 32),
+            "blockedQuery": opt(r.get("blocked_query"), 300),
             "waitSeconds": r.get("wait_seconds"),
             "blockingId": r.get("blocking_id"),
-            "blockingTrx": s(r.get("blocking_trx"), 32),
-            "blockingQuery": s(r.get("blocking_query"), 300),
-            "blockingState": s(r.get("blocking_state"), 32),
-            "objectSchema": s(r.get("object_schema"), 128),
-            "objectName": s(r.get("object_name"), 128),
+            "blockingTrx": opt(r.get("blocking_trx"), 32),
+            "blockingQuery": opt(r.get("blocking_query"), 300),
+            "blockingState": opt(r.get("blocking_state"), 32),
+            "objectSchema": opt(r.get("object_schema"), 128),
+            "objectName": opt(r.get("object_name"), 128),
         }
         for r in rows
     ]

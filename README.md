@@ -1,6 +1,6 @@
 <!-- mcp-name: io.github.AIops-tools/mysql-aiops -->
 
-# MySQL AIops (preview)
+# MySQL AIops
 
 > **Disclaimer**: Community-maintained open-source project. **Not affiliated with, endorsed by, or sponsored by Oracle Corporation or the MariaDB Foundation.** "MySQL" is a trademark of Oracle Corporation; "MariaDB" is a trademark of MariaDB plc; all product/trademark names belong to their respective owners. MIT licensed.
 
@@ -11,7 +11,6 @@ log, policy engine, token/runaway budget guard, undo-token recording, and
 graduated-autonomy risk tiers. The server **flavor** (mysql vs mariadb) is
 detected from `version()` and flavor-dependent statements branch automatically
 (`SHOW REPLICA STATUS` vs `SHOW SLAVE STATUS`).
-**Preview — mock-validated only, not run against a live server.**
 
 ## What it does
 
@@ -38,12 +37,52 @@ Four flagship signature analyses, plus the guarded reads and writes around them:
 ## What works
 
 - **CLI** (`mysql-aiops ...`): `init`, `overview`, `server`, `activity`, `query`, `index`, `table`, `repl`, `analyze`, `remediate`, `secret`, `doctor`, `mcp`.
-- **MCP server** (`mysql-aiops mcp` or `mysql-aiops-mcp`): **33 tools** (25 read, 8 write), every one wrapped with the bundled `@governed_tool` harness.
+- **MCP server** (`mysql-aiops mcp` or `mysql-aiops-mcp`): **35 tools** (26 read, 9 write), every one wrapped with the bundled `@governed_tool` harness.
 - **Encrypted credentials**: the account password lives in an encrypted store `~/.mysql-aiops/secrets.enc` (Fernet + scrypt) — **never plaintext on disk**. Unlock with a master password from `MYSQL_AIOPS_MASTER_PASSWORD` (MCP/CI) or an interactive prompt (CLI).
 - **Reversibility**: mutating writes fetch the **real before-state first** and record a faithful inverse — `create_index`↔`drop_index`; `drop_index` captures the index definition out of `SHOW CREATE TABLE` so undo recreates it exactly; `set_global_variable` captures the prior value from `SHOW GLOBAL VARIABLES` so undo sets it back. Irreversible ops (`kill_session`, `kill_query`, `optimize_table`, `analyze_table`, `reset_query_stats`) record prior state for audit but declare no undo.
 - **Safety**: every state-changing CLI op supports `--dry-run` and requires double confirmation; every write MCP tool takes a `dry_run` preview. All identifiers that cannot be parameterised (schema/table/index/column/variable names) are validated against a strict charset and backtick-quoted; all values are bound query parameters.
 
-## Capability matrix (33 MCP tools)
+## Security: read-only mode
+
+This tool is meant to be handed to an AI agent, so its safety story is enforced
+by the server rather than requested in a prompt:
+
+```bash
+export MYSQL_READ_ONLY=1
+```
+
+With that set, the **9 write tools are never registered**. An MCP client
+lists **26 tools instead of 35** — the writes are not hidden, not
+gated behind a flag, and not merely refused when called. They are absent from
+the session. A model cannot invoke a tool it was never offered, and cannot be
+argued into one.
+
+That distinction is the whole point. A tool that exists but refuses still invites
+retry loops and "I'll describe the call instead" behaviour from smaller models,
+and it leaves a reviewer trusting a promise. An absent tool is a fact you can
+check: connect, list the tools, and see that the writes are not there.
+
+Enforcement is two layers deep, so the switch cannot be sidestepped by changing
+entry point:
+
+| Layer | What it does | Covers |
+|---|---|---|
+| `@governed_tool` harness | refuses every non-read operation outright | MCP, CLI, and in-process callers |
+| MCP registration | write tools are removed from `list_tools()` | anything speaking MCP |
+
+Read operations are unaffected, and every call is still audited to
+`~/.mysql-aiops/audit.db`.
+
+> The read/write split is derived from each tool's declared `risk_level`, and a
+> test asserts that this never disagrees with the `[READ]`/`[WRITE]` tag in the
+> tool's own documentation — so a write can't quietly present itself as a read.
+
+Running a smaller / local model? See
+[agent-guardrails.md](skills/mysql-aiops/references/agent-guardrails.md) — it lists
+the guardrails this tool now enforces for you (so you don't spend prompt budget
+restating them) and gives a ready-made system prompt for what's left.
+
+## Capability matrix (35 MCP tools)
 
 | Domain | Tools | Count | R/W |
 |--------|-------|:-----:|:---:|
@@ -57,6 +96,7 @@ Four flagship signature analyses, plus the guarded reads and writes around them:
 | **Analysis (flagship)** | `slow_query_rca`, `lock_wait_rca`, `replication_lag_rca`, `fragmentation_analysis` | 4 | read |
 | **Writes** | `kill_session`, `kill_query`, `drop_index` | 3 | write (high) |
 | | `optimize_table`, `analyze_table`, `create_index`, `set_global_variable`, `reset_query_stats` | 5 | write (medium) |
+| **Undo** | `undo_list`, `undo_apply` | 2 | read / write |
 
 The flagship analyses accept injected records for pure/offline analysis, or pull
 live from a configured target. `top_queries`/`slow_query_rca` require
@@ -67,8 +107,8 @@ live from a configured target. `top_queries`/`slow_query_rca` require
 
 | Platform | Status |
 |----------|--------|
-| MySQL 8.0 / 8.4 | supported (preview; `SHOW REPLICA STATUS`, `performance_schema.data_lock_waits`) |
-| MariaDB 10.6+ / 11.x | supported (preview; `SHOW SLAVE STATUS`, `information_schema.innodb_lock_waits`) |
+| MySQL 8.0 / 8.4 | targeted (`SHOW REPLICA STATUS`, `performance_schema.data_lock_waits`) |
+| MariaDB 10.6+ / 11.x | targeted (`SHOW SLAVE STATUS`, `information_schema.innodb_lock_waits`) |
 | MySQL 5.7 and older | not targeted (EOL; pre-8.0 digest/lock views untested) |
 | Cloud-managed MySQL (RDS/Aurora/Cloud SQL flavors) | wire-compatible reads should work; managed restrictions (KILL, SET GLOBAL) apply — untested |
 
@@ -139,10 +179,16 @@ Coverage is intentionally a curated subset of MySQL's catalogs and maintenance
 surface. Missing a view, a metric, or a maintenance command? **Open an issue or
 PR** — contributions welcome. 缺功能提 issue/PR 欢迎留言。
 
-## Status
+## Verification status
 
-**Preview — mock-validated only, not run against a live server.** The catalog
-queries are modelled from the documented `information_schema` /
-`performance_schema` shapes for MySQL 8.x and MariaDB 10.6+ and need live
-verification. `mysql-aiops doctor` is the fastest live check (connectivity,
-flavor, performance_schema, replica role).
+**Mock-validated; not yet exercised against a live server.** Every module imports,
+every MCP tool carries the governance marker, the four flagship analyses are unit-tested
+against synthetic records, and reversible writes are asserted to record the correct
+inverse undo descriptor — but the catalog queries are modelled from the documented
+`information_schema` / `performance_schema` shapes for MySQL 8.x and MariaDB 10.6+ and
+have not been run against a real server.
+
+[docs/VERIFICATION.md](docs/VERIFICATION.md) is the checklist a live run must satisfy.
+`mysql-aiops doctor` is the fastest live check (connectivity, flavor,
+performance_schema, replica role). MySQL and MariaDB are both free and trivially
+containerised, so a local run is cheap.

@@ -1,10 +1,16 @@
 ---
 name: mysql-aiops
+slug: mysql-aiops
+displayName: "MySQL AIops"
+summary: "Governed MySQL/MariaDB DBA ops: slow-query, lock-wait, replication & fragmentation RCA; 35 tools."
+license: MIT
+homepage: https://github.com/AIops-tools/MySQL-AIops
+tags: [aiops, mcp, governance, mysql]
 description: >
   Use this skill whenever the user needs to operate or troubleshoot a MySQL 8.x or MariaDB 10.6+ server as a DBA — a one-shot server health overview (version + flavor, connection headroom, replica role); server reads (global variables, status counters, databases, storage engines); activity (sessions/processlist, long-running queries, open InnoDB transactions, lock waits); query stats (performance_schema statement-digest top-N, EXPLAIN FORMAT=JSON); index health (unused indexes, redundant/duplicate indexes, cardinality); table health (sizes, data_free fragmentation, engine/row-format status); replication (replica IO/SQL thread state and lag, binlog/GTID status); four flagship analyses — slow-query RCA (worst digest + EXPLAIN → cited cause/action incl. full-scan and lock-time-dominant classification), InnoDB lock-wait & deadlock chain RCA (wait-for tree, root blocker, last deadlock parsed from SHOW ENGINE INNODB STATUS), replication lag RCA (thread state/error fields → cause+action), and table fragmentation analysis (data_free → OPTIMIZE candidates); and guarded writes (kill a session or query, OPTIMIZE/ANALYZE TABLE, create/drop an index, SET GLOBAL a variable, reset digest stats).
   Always use this skill for "mysql health check", "why is this query slow", "top queries by time", "EXPLAIN this", "table fragmentation", "which indexes are unused", "redundant index", "who is blocking whom", "deadlock", "kill the session holding the lock", "replication lag", "replica stopped", "seconds behind master/source", "OPTIMIZE this table", "create/drop an index", or "SET GLOBAL max_connections" when the context is a MySQL or MariaDB database.
   Do NOT use for PostgreSQL — use postgres-aiops. Do NOT use when the target is OT / industrial equipment (use industrial-aiops), a hypervisor, a storage appliance, a backup product, or a container/cluster orchestrator (negative routing hints only).
-  Preview — common MySQL/MariaDB DBA operations with a built-in governance harness (audit, policy, token budget, undo, risk-tiers). Mock-validated only, not run against a live server.
+  Common MySQL/MariaDB DBA operations with a built-in governance harness (audit, policy, token budget, undo, risk-tiers). Behaviour is validated by a mock-based test suite; see docs/VERIFICATION.md for the live-verification checklist.
 installer:
   kind: uv
   package: mysql-aiops
@@ -13,7 +19,7 @@ allowed-tools:
   - Bash
 metadata: {"openclaw":{"requires":{"env":["MYSQL_AIOPS_CONFIG"],"bins":["mysql-aiops"],"config":["~/.mysql-aiops/config.yaml","~/.mysql-aiops/secrets.enc"]},"optional":{"env":["MYSQL_AIOPS_MASTER_PASSWORD"]},"primaryEnv":"MYSQL_AIOPS_CONFIG","homepage":"https://github.com/AIops-tools/MySQL-AIops","emoji":"🐬","os":["macos","linux"]}}
 compatibility: >
-  Standalone, self-governed MySQL/MariaDB DBA operations (preview). The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Connects via PyMySQL (30s timeouts) and reads information_schema / performance_schema; the server flavor (mysql vs mariadb) is detected from version() and flavor-dependent statements branch (SHOW REPLICA STATUS vs SHOW SLAVE STATUS; performance_schema.data_lock_waits vs information_schema.innodb_lock_waits).
+  Standalone, self-governed MySQL/MariaDB DBA operations. The governance harness (audit, policy, token/runaway budget, undo, risk-tiers) is bundled in the package — no external skill-family dependency. Connects via PyMySQL (30s timeouts) and reads information_schema / performance_schema; the server flavor (mysql vs mariadb) is detected from version() and flavor-dependent statements branch (SHOW REPLICA STATUS vs SHOW SLAVE STATUS; performance_schema.data_lock_waits vs information_schema.innodb_lock_waits).
   All write operations are audited to a local SQLite DB under ~/.mysql-aiops/ (relocatable via MYSQL_AIOPS_HOME).
   Credentials: the MySQL account password is stored ENCRYPTED in ~/.mysql-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'mysql-aiops init' to onboard, or 'mysql-aiops secret set <target>' to add one. The store is unlocked by a master password from MYSQL_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var MYSQL_<TARGET_NAME_UPPER>_PASSWORD is still honoured as a fallback with a deprecation warning (migrate with 'mysql-aiops secret migrate'). The password is passed to pymysql.connect at connect time and held only in memory; it is never logged or echoed.
   SQL safety: all values are bound query parameters; the few identifiers that cannot be parameterised (schema/table/index/column/variable names, ORDER BY columns) are validated against a strict identifier charset / allow-lists and backtick-quoted before interpolation. EXPLAIN rejects multi-statement input; the drop_index undo replay path is shape-gated to CREATE [UNIQUE] INDEX statements.
@@ -21,16 +27,16 @@ compatibility: >
   Webhooks: none — no outbound network calls beyond the configured MySQL connection.
   TLS: ssl_mode follows MySQL client semantics (default preferred); set verify_ca/verify_identity (with ssl_ca) on untrusted networks.
   Transitive dependencies: PyMySQL (pure-Python MySQL driver) and the MCP SDK. No post-install scripts or background services.
-  PREVIEW: mock-validated only; the information_schema / performance_schema queries are modelled from documented MySQL 8.x / MariaDB 10.6+ shapes and need live verification. Community-maintained; not affiliated with Oracle or the MariaDB Foundation — trademarks belong to their owners.
+  VERIFICATION: the information_schema / performance_schema queries are modelled from documented MySQL 8.x / MariaDB 10.6+ shapes and are validated by a mock-based test suite; they have not yet been exercised against a live server (see docs/VERIFICATION.md). Community-maintained; not affiliated with Oracle or the MariaDB Foundation — trademarks belong to their owners.
 ---
 
-# MySQL AIops (preview)
+# MySQL AIops
 
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Oracle Corporation or the MariaDB Foundation.** "MySQL" and "MariaDB" trademarks belong to their owners. Source at [github.com/AIops-tools/MySQL-AIops](https://github.com/AIops-tools/MySQL-AIops) under the MIT license.
 
-Governed MySQL / MariaDB DBA operations — **33 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.mysql-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The account password is stored **encrypted** (`~/.mysql-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
+Governed MySQL / MariaDB DBA operations — **35 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.mysql-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The account password is stored **encrypted** (`~/.mysql-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
-> **Standalone**: the governance harness is bundled in the package (`mysql_aiops.governance`) — mysql-aiops has no external skill-family dependency. **Preview / mock-only**: not run against a live server.
+> **Standalone**: the governance harness is bundled in the package (`mysql_aiops.governance`) — mysql-aiops has no external skill-family dependency. Behaviour is covered by a mock-based test suite; `docs/VERIFICATION.md` is the checklist for a live run against a real MySQL / MariaDB server.
 
 ## What This Skill Does
 
@@ -46,6 +52,7 @@ Governed MySQL / MariaDB DBA operations — **33 MCP tools**, every one wrapped 
 | **Analysis (flagship)** | slow-query RCA, lock-wait & deadlock RCA, replication-lag RCA, fragmentation | 4 | 4 read |
 | **Writes** | kill-session, kill-query, drop-index | 3 | 3 write (high) |
 | | optimize, analyze-table, create-index, SET GLOBAL, reset-stats | 5 | 5 write (medium) |
+| **Undo** | undo list, undo apply | 2 | 1 read / 1 write |
 
 The flagship analyses accept injected records for pure/offline analysis, or pull live from a configured target. `top_queries` / `slow_query_rca` require `performance_schema=ON`; the read account should have `PROCESS`, `REPLICATION CLIENT` and `SELECT` on `performance_schema`.
 
@@ -81,29 +88,103 @@ mysql-aiops doctor     # connectivity + flavor + performance_schema + replica ro
 
 ## Common Workflows
 
-### Root-cause a slow database
+### 1. "The application is slow" — from complaint to a working index
 
-1. `mysql-aiops analyze slow-query` → the worst statement digest with cited findings (full scan / no index used, lock time dominant, rows examined per sent, tmp-disk spill, high calls) and an action for each
-2. `mysql-aiops query explain "<sql>"` → confirm the plan (look for `access_type: ALL` on a large table)
-3. If the fix is an index: `mysql-aiops remediate create-index <table> <cols> --dry-run`, then re-run without `--dry-run`
+1. `mysql-aiops doctor` → connectivity, detected flavor, and whether
+   `performance_schema` is actually enabled (if it is off, the digest-based analysis
+   below has nothing to read — fix that first).
+2. `mysql-aiops overview` → one-shot: version, connection counts, buffer-pool and
+   activity headline, so you know whether this is a query problem or a load problem.
+3. `mysql-aiops analyze slow-query` → the worst statement digests, each with cited
+   findings (full scan / no index used, lock time dominant, rows examined per row sent,
+   tmp-table spill to disk, high call count) and a concrete action per finding.
+4. `mysql-aiops query top --limit 20` → confirm the digest the RCA blamed really is the
+   top consumer, not a one-off.
+5. `mysql-aiops query explain "<sql>"` → read the actual plan. `access_type: ALL` on a
+   large table is the signature that an index will help; a plan already using an index
+   means the fix is elsewhere.
+6. `mysql-aiops index unused` and `mysql-aiops index redundant` → before adding one,
+   check you are not duplicating an index that already exists (a redundant index costs
+   writes and buys nothing).
+7. `mysql-aiops remediate create-index <table> <col> --name idx_x --dry-run` → prints
+   the exact DDL; re-run without `--dry-run` (double-confirm). The write is reversible
+   and records an inverse `drop_index` undo descriptor.
+8. Re-run `mysql-aiops query explain "<sql>"` and `analyze slow-query` to prove the plan
+   changed and the digest dropped.
+9. **Failure branch**: if the plan did not change, the optimizer may be working from
+   stale statistics — `mysql-aiops remediate analyze-table <table>` and re-check. If the
+   index made things *worse* (write amplification, or the optimizer picking it wrongly),
+   reverse it: `mysql-aiops undo list` → `mysql-aiops undo apply <id>` drops exactly the
+   index that was created. Index DDL on a large table can be long-running — if it stalls,
+   `mysql-aiops activity long --min-seconds 60` will show it, and cancelling mid-DDL is
+   its own risk, so size the table with `mysql-aiops table sizes` *before* step 7.
 
-### Break a lock pile-up / investigate a deadlock
+### 2. A lock pile-up is stalling writes
 
-1. `mysql-aiops analyze lock-waits` → the wait-for tree names the **root blocker** session, and the last deadlock (victim + statements) is attached
-2. Inspect it with `mysql-aiops activity sessions` / `mysql-aiops activity transactions`
-3. `mysql-aiops remediate kill-query <id>` (or `kill <id>`) — dry-run + double-confirm; the prior session/query is captured for audit
+1. `mysql-aiops activity lock-waits` → the raw blocking/blocked pairs, straight from
+   the server.
+2. `mysql-aiops analyze lock-waits` → the wait-for tree resolved down to the **root
+   blocker** session, with the last deadlock (victim + both statements) attached.
+3. `mysql-aiops activity transactions` → what the root blocker is actually doing and how
+   long it has been open. An idle-in-transaction blocker is an application bug, not a
+   database one.
+4. `mysql-aiops activity sessions --no-sleeping` → confirm the blocker's user, host, and
+   statement before you touch it.
+5. Cancel the statement, not the connection, if that is enough:
+   `mysql-aiops remediate kill-query <session-id> --dry-run` then for real
+   (double-confirm). Escalate to `mysql-aiops remediate kill <session-id>` only if the
+   session must go.
+6. Re-run `mysql-aiops analyze lock-waits` → the tree should be empty.
+7. **Failure branch**: `kill` and `kill-query` are **irreversible — they record no
+   undo**, and killing a long-running transaction triggers a rollback that can itself
+   take a long time and hold locks meanwhile. If the tree does not clear, do not kill
+   more sessions in a loop (the runaway budget guard will stop you anyway): re-read
+   `activity transactions` to see whether the rollback is in progress, and go after the
+   application holding the transaction open instead.
 
-### Fix replication lag
+### 3. A replica has fallen behind
 
-1. `mysql-aiops analyze replication` → cited cause (IO thread stopped with `Last_IO_Error`, SQL thread stopped with `Last_SQL_Error`, applier lagging, intentional `SQL_Delay`)
-2. `mysql-aiops repl status` / `mysql-aiops repl binlog` for the raw records
-3. Apply the cited action (fix connectivity/credentials, repair the diverged row, enable parallel apply)
+1. `mysql-aiops analyze replication` → the cited cause: IO thread stopped (with the real
+   `Last_IO_Error`), SQL thread stopped (with `Last_SQL_Error`), applier simply lagging,
+   or an intentional `SQL_Delay`.
+2. `mysql-aiops repl status` → the raw replica record, so you can see the seconds-behind
+   value and thread states the analysis quoted. Note the tool branches on flavor
+   automatically (`SHOW REPLICA STATUS` on MySQL, `SHOW SLAVE STATUS` on MariaDB).
+3. `mysql-aiops repl binlog` → binlog position and retention, to judge whether the
+   replica can still catch up or has fallen off the end of the logs.
+4. `mysql-aiops overview` on the replica → check the lag is not just resource pressure
+   masquerading as a replication fault.
+5. Apply the cause-specific fix: connectivity/credentials for a stopped IO thread, the
+   diverged row for a stopped SQL thread, or parallel apply for a slow applier —
+   `mysql-aiops remediate set slave_parallel_workers 4 --dry-run` first (reversible; the
+   prior value is captured as the undo descriptor).
+6. **Failure branch**: an intentional `SQL_Delay` is *not* a fault — the analysis says so,
+   and "fixing" it defeats a deliberate safety window. If a `SET GLOBAL` made things
+   worse, `mysql-aiops undo apply <id>` restores the **prior** value. If the replica has
+   fallen off the retained binlogs, no setting will recover it — it needs a reseed, which
+   is out of this tool's scope.
 
-### Reclaim fragmentation safely (reversible index changes)
+### 4. Reclaim space from a bloated table
 
-1. `mysql-aiops analyze fragmentation` → tables ranked by reclaimable `data_free` with cited numbers
-2. `mysql-aiops remediate optimize <table> --dry-run` → preview, then re-run to OPTIMIZE
-3. For a redundant index: `mysql-aiops remediate drop-index <table> <name>` — rebuilds the definition from `SHOW CREATE TABLE` first and records an inverse recreate undo descriptor
+1. `mysql-aiops analyze fragmentation` → tables ranked by reclaimable `data_free`, each
+   citing the measured bytes.
+2. `mysql-aiops table sizes` and `mysql-aiops table fragmentation` → confirm the size and
+   free space independently, and see how big the rebuild will actually be.
+3. `mysql-aiops index unused` → while you are here, an index nothing has used is dead
+   weight; `mysql-aiops index stats` shows the usage numbers behind that claim.
+4. `mysql-aiops remediate drop-index <table> <index-name> --dry-run` then for real — the
+   write rebuilds the index definition from `SHOW CREATE TABLE` **before** dropping, so
+   the undo descriptor recreates exactly the index that existed.
+5. `mysql-aiops remediate optimize <table> --dry-run` → preview, then re-run to
+   `OPTIMIZE TABLE` (double-confirm).
+6. Re-run `mysql-aiops analyze fragmentation` to confirm the space came back.
+7. **Failure branch**: `OPTIMIZE TABLE` rebuilds the table and can lock or block writes
+   for the duration on a large table — run it in a maintenance window, and check
+   `mysql-aiops activity long` if the system goes quiet. It records **no** undo (there is
+   nothing to reverse). If dropping the index turned out to be wrong,
+   `mysql-aiops undo apply <id>` recreates it from the captured definition — this is the
+   one step in this recipe that *is* reversible, which is why it comes before the
+   OPTIMIZE.
 
 ### Offline analysis (no live server)
 

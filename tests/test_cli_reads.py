@@ -191,7 +191,8 @@ def test_cli_query_top_orders_and_limits(monkeypatch):
     result = runner.invoke(app, ["query", "top", "--order-by", "calls", "--limit", "5"])
     assert result.exit_code == 0, result.output
     sql, params = fake.queried[0]
-    assert "COUNT_STAR DESC" in sql and params == {"limit": 5}
+    # limit + 1 is deliberate: the extra row is how truncation is measured.
+    assert "COUNT_STAR DESC" in sql and params == {"limit": 6}
 
 
 @pytest.mark.unit

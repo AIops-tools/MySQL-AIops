@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mysql_aiops.ops._util import human_bytes, s
+from mysql_aiops.ops._util import human_bytes, opt
 
 _SYSTEM_SCHEMAS = "('mysql', 'information_schema', 'performance_schema', 'sys')"
 
@@ -68,12 +68,15 @@ LIMIT %(limit)s
 
 def table_sizes(conn: Any, limit: int = 20) -> dict:
     """[READ] Largest tables by data + index size."""
-    rows = conn.query(_SIZES_SQL, {"limit": max(1, min(int(limit), 500))})
+    want = max(1, min(int(limit), 500))
+    rows = conn.query(_SIZES_SQL, {"limit": want + 1})  # +1 measures truncation
+    truncated = len(rows) > want
+    rows = rows[:want]
     tables = [
         {
-            "schema": s(r.get("schema"), 128),
-            "table": s(r.get("table"), 128),
-            "engine": s(r.get("engine"), 32),
+            "schema": opt(r.get("schema"), 128),
+            "table": opt(r.get("table"), 128),
+            "engine": opt(r.get("engine"), 32),
             "estRows": r.get("est_rows"),
             "dataBytes": r.get("data_bytes"),
             "indexBytes": r.get("index_bytes"),
@@ -82,14 +85,19 @@ def table_sizes(conn: Any, limit: int = 20) -> dict:
         }
         for r in rows
     ]
-    return {"count": len(tables), "tables": tables}
+    return {
+        "tables": tables,
+        "returned": len(tables),
+        "limit": want,
+        "truncated": truncated,
+    }
 
 
 def _fragmentation_row(r: dict) -> dict:
     return {
-        "schema": s(r.get("schema"), 128),
-        "table": s(r.get("table"), 128),
-        "engine": s(r.get("engine"), 32),
+        "schema": opt(r.get("schema"), 128),
+        "table": opt(r.get("table"), 128),
+        "engine": opt(r.get("engine"), 32),
         "estRows": r.get("est_rows"),
         "dataBytes": r.get("data_bytes"),
         "indexBytes": r.get("index_bytes"),
@@ -101,11 +109,15 @@ def _fragmentation_row(r: dict) -> dict:
 
 def table_fragmentation(conn: Any, limit: int = 50) -> dict:
     """[READ] data_free per table (space OPTIMIZE TABLE could reclaim), worst first."""
-    rows = conn.query(_FRAGMENTATION_SQL, {"limit": max(1, min(int(limit), 500))})
-    tables = [_fragmentation_row(r) for r in rows]
+    want = max(1, min(int(limit), 500))
+    rows = conn.query(_FRAGMENTATION_SQL, {"limit": want + 1})  # +1 measures truncation
+    truncated = len(rows) > want
+    tables = [_fragmentation_row(r) for r in rows[:want]]
     return {
-        "count": len(tables),
         "tables": tables,
+        "returned": len(tables),
+        "limit": want,
+        "truncated": truncated,
         "note": (
             "freePct = data_free / (data + index + free) from "
             "information_schema.tables — a fragmentation proxy. OPTIMIZE TABLE "
@@ -117,26 +129,31 @@ def table_fragmentation(conn: Any, limit: int = 50) -> dict:
 
 def table_status(conn: Any, limit: int = 50) -> dict:
     """[READ] Per-table engine, row format, row estimate and last update time."""
-    rows = conn.query(_STATUS_SQL, {"limit": max(1, min(int(limit), 500))})
+    want = max(1, min(int(limit), 500))
+    rows = conn.query(_STATUS_SQL, {"limit": want + 1})  # +1 measures truncation
+    truncated = len(rows) > want
+    rows = rows[:want]
     tables = [
         {
-            "schema": s(r.get("schema"), 128),
-            "table": s(r.get("table"), 128),
-            "engine": s(r.get("engine"), 32),
-            "rowFormat": s(r.get("row_format"), 32),
+            "schema": opt(r.get("schema"), 128),
+            "table": opt(r.get("table"), 128),
+            "engine": opt(r.get("engine"), 32),
+            "rowFormat": opt(r.get("row_format"), 32),
             "estRows": r.get("est_rows"),
             "avgRowLength": r.get("avg_row_length"),
             "autoIncrement": r.get("auto_increment"),
-            "createTime": s(r.get("create_time"), 64),
-            "updateTime": s(r.get("update_time"), 64),
-            "collation": s(r.get("table_collation"), 64),
+            "createTime": opt(r.get("create_time"), 64),
+            "updateTime": opt(r.get("update_time"), 64),
+            "collation": opt(r.get("table_collation"), 64),
         }
         for r in rows
     ]
     non_innodb = [t["table"] for t in tables
                   if t["engine"] and t["engine"].lower() != "innodb"]
     return {
-        "count": len(tables),
         "nonInnodbTables": non_innodb,
         "tables": tables,
+        "returned": len(tables),
+        "limit": want,
+        "truncated": truncated,
     }

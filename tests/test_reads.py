@@ -135,7 +135,8 @@ def test_top_queries_orders_by_whitelist_column_and_computes_ratios():
     # the whitelisted column must appear in the emitted SQL, not the raw choice
     sql, params = conn.queried[0]
     assert "SUM_NO_INDEX_USED DESC" in sql
-    assert params == {"limit": 5}
+    # limit + 1 is deliberate: the extra row is how truncation is measured.
+    assert params == {"limit": 6}
 
 
 @pytest.mark.unit

@@ -22,6 +22,11 @@ def top_queries(
             lock_time, no_index.
         limit: Number of statements to return (1..200, default 20).
         target: Target name from config; omit for the default.
+
+    Returns an envelope: {"statements": [...], "returned": N, "limit": L,
+    "truncated": bool}. When "truncated" is true there is more beyond what
+    was returned — re-run with a higher limit rather than treating this as
+    the complete picture.
     """
     return ops.top_queries(_get_connection(target), order_by=order_by, limit=limit)
 

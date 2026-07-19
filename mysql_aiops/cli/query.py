@@ -41,8 +41,13 @@ def query_top(
     from mysql_aiops.ops import queries as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(
-        ops.top_queries(conn, order_by=order_by, limit=limit), default=str))
+    result = ops.top_queries(conn, order_by=order_by, limit=limit)
+    console.print_json(json.dumps(result, default=str))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… truncated at {result.get('limit')} rows — "
+            f"re-run with a higher --limit to see the rest.[/yellow]"
+        )
 
 
 @query_app.command("explain")

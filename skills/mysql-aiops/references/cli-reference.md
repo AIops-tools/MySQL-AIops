@@ -1,8 +1,8 @@
 # mysql-aiops CLI reference
 
-> Preview / mock-only. The `information_schema` / `performance_schema` queries
-> are modelled from documented MySQL 8.x / MariaDB 10.6+ shapes and need live
-> verification.
+> The `information_schema` / `performance_schema` queries are modelled from documented
+> MySQL 8.x / MariaDB 10.6+ shapes and are mock-validated; see `docs/VERIFICATION.md`
+> for the live-run checklist.
 
 ## Setup & diagnostics
 

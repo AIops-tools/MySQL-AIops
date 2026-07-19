@@ -1,6 +1,7 @@
 # mysql-aiops setup & security guide
 
-> Preview / mock-only — not run against a live MySQL / MariaDB server.
+> Mock-validated; not yet run against a live MySQL / MariaDB server. `mysql-aiops doctor`
+> is the fastest live check — see `docs/VERIFICATION.md`.
 
 ## 1. Install
 

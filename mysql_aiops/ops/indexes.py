@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mysql_aiops.ops._util import s
+from mysql_aiops.ops._util import opt, s
 
 _UNUSED_SQL = """
 SELECT OBJECT_SCHEMA AS `schema`,
@@ -46,9 +46,9 @@ def unused_indexes(conn: Any) -> dict:
     rows = conn.query(_UNUSED_SQL)
     indexes = [
         {
-            "schema": s(r.get("schema"), 128),
-            "table": s(r.get("table"), 128),
-            "index": s(r.get("index"), 128),
+            "schema": opt(r.get("schema"), 128),
+            "table": opt(r.get("table"), 128),
+            "index": opt(r.get("index"), 128),
         }
         for r in rows
     ]

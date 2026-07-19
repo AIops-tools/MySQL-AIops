@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Annotated
 
 import typer
 
@@ -17,29 +18,56 @@ table_app = typer.Typer(
 
 @table_app.command("sizes")
 @cli_errors
-def table_sizes(target: TargetOption = None) -> None:
+def table_sizes(
+    limit: Annotated[int, typer.Option("--limit", help="Rows to return")] = 20,
+    target: TargetOption = None,
+) -> None:
     """Largest tables by data + index size."""
     from mysql_aiops.ops import tables as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.table_sizes(conn), default=str))
+    result = ops.table_sizes(conn, limit=limit)
+    console.print_json(json.dumps(result, default=str))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… truncated at {result.get('limit')} rows — "
+            f"re-run with a higher --limit to see the rest.[/yellow]"
+        )
 
 
 @table_app.command("fragmentation")
 @cli_errors
-def table_fragmentation(target: TargetOption = None) -> None:
+def table_fragmentation(
+    limit: Annotated[int, typer.Option("--limit", help="Rows to return")] = 50,
+    target: TargetOption = None,
+) -> None:
     """data_free per table (space OPTIMIZE TABLE could reclaim)."""
     from mysql_aiops.ops import tables as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.table_fragmentation(conn), default=str))
+    result = ops.table_fragmentation(conn, limit=limit)
+    console.print_json(json.dumps(result, default=str))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… truncated at {result.get('limit')} rows — "
+            f"re-run with a higher --limit to see the rest.[/yellow]"
+        )
 
 
 @table_app.command("status")
 @cli_errors
-def table_status(target: TargetOption = None) -> None:
+def table_status(
+    limit: Annotated[int, typer.Option("--limit", help="Rows to return")] = 50,
+    target: TargetOption = None,
+) -> None:
     """Per-table engine, row format and last update time."""
     from mysql_aiops.ops import tables as ops
 
     conn, _ = get_connection(target)
-    console.print_json(json.dumps(ops.table_status(conn), default=str))
+    result = ops.table_status(conn, limit=limit)
+    console.print_json(json.dumps(result, default=str))
+    if result.get("truncated"):
+        console.print(
+            f"[yellow]… truncated at {result.get('limit')} rows — "
+            f"re-run with a higher --limit to see the rest.[/yellow]"
+        )

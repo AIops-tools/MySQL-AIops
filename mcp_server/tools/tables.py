@@ -16,6 +16,11 @@ def table_sizes(limit: int = 20, target: Optional[str] = None) -> dict:
     Args:
         limit: Number of tables to return, largest first (default 20).
         target: Target name from config; omit for the default.
+
+    Returns an envelope: {"tables": [...], "returned": N, "limit": L,
+    "truncated": bool}. When "truncated" is true there is more beyond what
+    was returned — re-run with a higher limit rather than treating this as
+    the complete picture.
     """
     return ops.table_sizes(_get_connection(target), limit=limit)
 
@@ -29,6 +34,11 @@ def table_fragmentation(limit: int = 50, target: Optional[str] = None) -> dict:
     Args:
         limit: Number of tables to inspect (default 50).
         target: Target name from config; omit for the default.
+
+    Returns an envelope: {"tables": [...], "returned": N, "limit": L,
+    "truncated": bool}. When "truncated" is true there is more beyond what
+    was returned — re-run with a higher limit rather than treating this as
+    the complete picture.
     """
     return ops.table_fragmentation(_get_connection(target), limit=limit)
 
@@ -44,5 +54,10 @@ def table_status(limit: int = 50, target: Optional[str] = None) -> dict:
     Args:
         limit: Number of tables to inspect (default 50).
         target: Target name from config; omit for the default.
+
+    Returns an envelope: {"tables": [...], "returned": N, "limit": L,
+    "truncated": bool}. When "truncated" is true there is more beyond what
+    was returned — re-run with a higher limit rather than treating this as
+    the complete picture.
     """
     return ops.table_status(_get_connection(target), limit=limit)

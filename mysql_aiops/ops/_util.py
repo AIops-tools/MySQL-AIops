@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from mysql_aiops.governance import sanitize
+from mysql_aiops.governance import opt_str, sanitize
 
 # A MySQL unquoted identifier component: letter/underscore then
 # letters/digits/underscore/dollar. We deliberately reject everything else
@@ -45,6 +45,22 @@ STATEMENT_ORDER_COLUMNS = {
 def s(value: Any, limit: int = 200) -> str:
     """Sanitize an arbitrary value to a bounded, injection-safe string."""
     return sanitize(str(value if value is not None else ""), limit)
+
+
+def opt(value: Any, limit: int = 200) -> str | None:
+    """Sanitize an *optional* field, preserving the difference between absent and empty.
+
+    Companion to :func:`s`, which folds ``None`` into ``""``. MySQL catalog and
+    performance_schema rows are full of genuinely-absent values — a session with
+    no current statement has a NULL ``INFO``, a replica that has never errored
+    has no ``Last_IO_Error``, and the 8.0 rename means ``Replica_IO_Running``
+    and ``Slave_IO_Running`` are never both present. NULL is not the empty
+    string, and collapsing the two hides that from the caller.
+
+    Use this for anything read out of a result row; keep :func:`s` for values
+    the caller supplied and that therefore always exist.
+    """
+    return opt_str(value, limit)
 
 
 def quote_ident(part: str) -> str:

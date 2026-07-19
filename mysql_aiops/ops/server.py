@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mysql_aiops.ops._util import human_bytes, s
+from mysql_aiops.ops._util import human_bytes, opt, s
 
 _DATABASES_SQL = """
 SELECT t.table_schema AS name,
@@ -45,7 +45,7 @@ def server_version(conn: Any) -> dict:
         "uptimeDays": round(uptime_seconds / 86400.0, 1),
         "readOnly": str(read_only.get("Value", "")).upper() == "ON",
         "superReadOnly": str(super_read_only.get("Value", "")).upper() == "ON",
-        "dataDirectory": s(datadir.get("Value"), 256),
+        "dataDirectory": opt(datadir.get("Value"), 256),
     }
 
 
@@ -57,8 +57,8 @@ def show_variables(conn: Any, pattern: str | None = None) -> list[dict]:
         rows = conn.query("SHOW GLOBAL VARIABLES")
     return [
         {
-            "name": s(r.get("Variable_name"), 128),
-            "value": s(r.get("Value"), 512),
+            "name": opt(r.get("Variable_name"), 128),
+            "value": opt(r.get("Value"), 512),
         }
         for r in rows
     ]
@@ -72,8 +72,8 @@ def show_status(conn: Any, pattern: str | None = None) -> list[dict]:
         rows = conn.query("SHOW GLOBAL STATUS")
     return [
         {
-            "name": s(r.get("Variable_name"), 128),
-            "value": s(r.get("Value"), 512),
+            "name": opt(r.get("Variable_name"), 128),
+            "value": opt(r.get("Value"), 512),
         }
         for r in rows
     ]
@@ -84,7 +84,7 @@ def list_databases(conn: Any) -> list[dict]:
     rows = conn.query(_DATABASES_SQL)
     return [
         {
-            "name": s(r.get("name"), 128),
+            "name": opt(r.get("name"), 128),
             "tableCount": r.get("table_count"),
             "dataBytes": r.get("data_bytes"),
             "indexBytes": r.get("index_bytes"),
@@ -100,11 +100,11 @@ def list_engines(conn: Any) -> list[dict]:
     rows = conn.query("SHOW ENGINES")
     return [
         {
-            "engine": s(r.get("Engine"), 64),
-            "support": s(r.get("Support"), 32),
+            "engine": opt(r.get("Engine"), 64),
+            "support": opt(r.get("Support"), 32),
             "isDefault": str(r.get("Support", "")).upper() == "DEFAULT",
-            "transactions": s(r.get("Transactions"), 8),
-            "comment": s(r.get("Comment"), 200),
+            "transactions": opt(r.get("Transactions"), 8),
+            "comment": opt(r.get("Comment"), 200),
         }
         for r in rows
     ]

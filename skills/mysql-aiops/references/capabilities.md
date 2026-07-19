@@ -1,6 +1,6 @@
 # mysql-aiops capabilities
 
-> Preview / mock-only. 33 MCP tools (25 read, 8 write). The
+> 35 MCP tools (26 read, 9 write); mock-validated, see `docs/VERIFICATION.md`. The
 > `information_schema` / `performance_schema` queries are modelled from
 > documented MySQL 8.x / MariaDB 10.6+ shapes and need live verification.
 > `top_queries` / `slow_query_rca` require `performance_schema=ON`; the read

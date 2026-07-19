@@ -155,7 +155,7 @@ def test_mcp_table_tools(gov_home, monkeypatch):
          "free_bytes": 50, "free_pct": 10.0, "row_format": "Fixed"},
     ]})
     _bind(monkeypatch, t_tables, fake)
-    assert t_tables.table_sizes()["count"] == 1
+    assert t_tables.table_sizes()["returned"] == 1
     assert t_tables.table_fragmentation()["tables"][0]["freePct"] == 10.0
     assert t_tables.table_status()["nonInnodbTables"] == ["t"]
 

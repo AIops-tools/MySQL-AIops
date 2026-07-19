@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from mysql_aiops.ops._util import qualify, quote_ident, s
+from mysql_aiops.ops._util import opt, qualify, quote_ident, s
 
 _VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -40,13 +40,13 @@ def _capture_session(conn: Any, session_id: int) -> dict:
     ) or {}
     return {
         "id": row.get("id"),
-        "user": s(row.get("user"), 128),
-        "host": s(row.get("host"), 128),
-        "database": s(row.get("db"), 128),
-        "command": s(row.get("command"), 64),
+        "user": opt(row.get("user"), 128),
+        "host": opt(row.get("host"), 128),
+        "database": opt(row.get("db"), 128),
+        "command": opt(row.get("command"), 64),
         "ageSeconds": row.get("time"),
-        "state": s(row.get("state"), 128),
-        "query": s(row.get("query"), 500),
+        "state": opt(row.get("state"), 128),
+        "query": opt(row.get("query"), 500),
     }
 
 
@@ -96,17 +96,17 @@ def _capture_table_stats(conn: Any, table: str) -> dict:
         "dataBytes": row.get("data_length"),
         "indexBytes": row.get("index_length"),
         "freeBytes": row.get("data_free"),
-        "updateTime": s(row.get("update_time"), 64),
+        "updateTime": opt(row.get("update_time"), 64),
     }
 
 
 def _maintenance_result(rows: list[dict]) -> list[dict]:
     return [
         {
-            "table": s(r.get("Table"), 256),
-            "op": s(r.get("Op"), 32),
-            "msgType": s(r.get("Msg_type"), 32),
-            "msgText": s(r.get("Msg_text"), 300),
+            "table": opt(r.get("Table"), 256),
+            "op": opt(r.get("Op"), 32),
+            "msgType": opt(r.get("Msg_type"), 32),
+            "msgText": opt(r.get("Msg_text"), 300),
         }
         for r in (rows or [])
     ]
@@ -288,7 +288,7 @@ def set_global_variable(conn: Any, name: str, value: str) -> dict:
         "action": "set_global_variable",
         "variable": var_name,
         "newValue": str(value),
-        "priorState": {"value": s(prior.get("Value"), 512)},
+        "priorState": {"value": opt(prior.get("Value"), 512)},
         "persistent": False,
         "note": (
             "Runtime-only change: persist it in my.cnf (or SET PERSIST on "

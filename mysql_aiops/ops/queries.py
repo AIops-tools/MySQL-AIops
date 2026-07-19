@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from mysql_aiops.ops._util import order_column, s
+from mysql_aiops.ops._util import opt, order_column, s
 
 _TOP_SQL = """
 SELECT SCHEMA_NAME AS schema_name,
@@ -50,9 +50,9 @@ def _statement_row(r: dict) -> dict:
     total_ms = float(r.get("total_time_ms") or 0)
     lock_ms = float(r.get("lock_time_ms") or 0)
     return {
-        "schema": s(r.get("schema_name"), 128),
-        "digest": s(r.get("digest"), 64),
-        "query": s(r.get("digest_text"), 400),
+        "schema": opt(r.get("schema_name"), 128),
+        "digest": opt(r.get("digest"), 64),
+        "query": opt(r.get("digest_text"), 400),
         "calls": calls,
         "totalTimeMs": total_ms,
         "meanTimeMs": float(r.get("mean_time_ms") or 0),
@@ -65,8 +65,8 @@ def _statement_row(r: dict) -> dict:
         "noIndexUsedPct": round(100.0 * no_index / calls, 1) if calls else 0.0,
         "tmpDiskTables": r.get("tmp_disk_tables"),
         "sortMergePasses": r.get("sort_merge_passes"),
-        "firstSeen": s(r.get("first_seen"), 64),
-        "lastSeen": s(r.get("last_seen"), 64),
+        "firstSeen": opt(r.get("first_seen"), 64),
+        "lastSeen": opt(r.get("last_seen"), 64),
     }
 
 
@@ -76,14 +76,31 @@ def top_queries(conn: Any, order_by: str = "total_time", limit: int = 20) -> dic
     ``order_by`` is one of total_time, mean_time, calls, rows_examined,
     lock_time, no_index — mapped to a real column through a whitelist, so no
     caller text ever reaches the ORDER BY.
+
+    Returns a truncation envelope::
+
+        {"statements": [...], "returned": 20, "limit": 20, "truncated": true}
+
+    A top-N of slow queries is exactly the read where "there is more" matters —
+    the 21st digest may be the one causing the incident. A bare list cannot say
+    so; the consumer would have to infer it from the length happening to equal
+    the limit, and a smaller local model faced with a long result tends to
+    report that nothing came back at all.
     """
     col = order_column(order_by)  # validated → safe to interpolate below
     sql = _TOP_SQL.format(col=col)  # nosec B608 — col is whitelisted, not user text
-    rows = conn.query(sql, {"limit": max(1, min(int(limit), 200))})
+    want = max(1, min(int(limit), 200))
+    # One more row than asked for, so truncation is measured rather than guessed
+    # from the returned count happening to equal the limit.
+    rows = conn.query(sql, {"limit": want + 1})
+    truncated = len(rows) > want
+    rows = rows[:want]
     return {
         "orderBy": order_by,
-        "count": len(rows),
         "statements": [_statement_row(r) for r in rows],
+        "returned": len(rows),
+        "limit": want,
+        "truncated": truncated,
         "note": (
             "Requires performance_schema=ON. Times are milliseconds (converted "
             "from picosecond timers); noIndexUsedPct is the share of executions "

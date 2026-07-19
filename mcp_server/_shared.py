@@ -75,7 +75,7 @@ def tool_errors(shape: str = "dict") -> Callable:
 mcp = FastMCP(
     "mysql-aiops",
     instructions=(
-        "Governed MySQL / MariaDB DBA operations (preview): a one-shot server "
+        "Governed MySQL / MariaDB DBA operations: a one-shot server "
         "'overview'; server reads (version+flavor/variables/status/databases/"
         "engines); activity (sessions, long-running queries, open transactions, "
         "lock waits); query stats (statement-digest top-N, EXPLAIN); index and "

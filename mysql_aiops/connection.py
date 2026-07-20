@@ -50,6 +50,26 @@ class MySQLError(Exception):
         super().__init__(message)
 
 
+class MySQLConnectionLostError(MySQLError):
+    """An ESTABLISHED connection dropped while a statement was running.
+
+    Distinct from an ordinary failure because the outcome is genuinely
+    undetermined: the statement may have committed before the link died. InnoDB
+    rolls back on connection loss, so usually nothing landed — but a COMMIT
+    whose acknowledgement was lost did land, and from here the two are
+    indistinguishable. The MCP layer maps this to ``status=unknown`` rather than
+    asserting a failure it cannot vouch for.
+
+    Note the discriminator is WHERE it was raised, not the errno: 2006 and 2013
+    mean "could not connect" from ``connect()`` and "the link died mid-statement"
+    from ``execute()``. pymysql gives both the same class and code, so position
+    is the only reliable signal.
+    """
+
+
+_LOST_MID_STATEMENT = (2006, 2013)  # server has gone away / lost connection during query
+
+
 def _errno(exc: pymysql.MySQLError) -> int | None:
     args = getattr(exc, "args", ())
     if args and isinstance(args[0], int):
@@ -148,9 +168,11 @@ class MySQLConnection:
                 affected = cur.execute(sql, params)
                 return int(affected or 0)
         except pymysql.MySQLError as exc:
-            raise MySQLError(
-                _teaching_message(exc, self._target), errno=_errno(exc)
-            ) from exc
+            code = _errno(exc)
+            # Reached only on an established connection, so these codes mean the
+            # link died mid-statement — not that we failed to reach the server.
+            cls = MySQLConnectionLostError if code in _LOST_MID_STATEMENT else MySQLError
+            raise cls(_teaching_message(exc, self._target), errno=code) from exc
 
     def close(self) -> None:
         try:

@@ -73,12 +73,18 @@ def kill_session(session_id: int, dry_run: bool = False, target: Optional[str] =
     Captures the session's user/host/query for the audit trail; a kill cannot
     be undone, so no undo is offered. Pass dry_run=True to preview.
 
+    Refuses this tool's own session id — including under dry_run, which must
+    report a refusal rather than preview a call that will be refused.
+
     Args:
         session_id: Session/connection id (from list_sessions).
         dry_run: If True, preview without killing.
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Ahead of the dry_run return: a preview whose real call would be refused
+    # must say so, or the caller reads the refusal as transient and retries.
+    ops.guard_kill_session(conn, session_id, "kill_session")
     if dry_run:
         return {"dryRun": True, "wouldKillSession": {"sessionId": session_id}}
     return ops.kill_session(conn, session_id)
@@ -94,12 +100,16 @@ def kill_query(session_id: int, dry_run: bool = False, target: Optional[str] = N
     Captures the session's user/host/query for audit. Pass dry_run=True to
     preview.
 
+    Refuses this tool's own session id — the statement it would cancel is this
+    very call. Enforced under dry_run too.
+
     Args:
         session_id: Session/connection id (from list_sessions).
         dry_run: If True, preview without cancelling.
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    ops.guard_kill_session(conn, session_id, "kill_query")
     if dry_run:
         return {"dryRun": True, "wouldKillQuery": {"sessionId": session_id}}
     return ops.kill_query(conn, session_id)
@@ -244,6 +254,12 @@ def set_global_variable(
     the harness records an undo that sets it back. Pass dry_run=True to
     preview.
 
+    Refuses the globals that would lock this tool out of the server
+    (init_connect, max_connections, max_user_connections, read_only,
+    super_read_only, skip_networking, require_secure_transport, and
+    wait_timeout/interactive_timeout below 30s). SET GLOBAL is immediate, so
+    those strand the undo. Enforced under dry_run too.
+
     Args:
         name: The global variable name (e.g. max_connections).
         value: The new value (as a string).
@@ -251,6 +267,9 @@ def set_global_variable(
         target: Target name from config; omit for the default.
     """
     conn = _get_connection(target)
+    # Static denylist, so this costs nothing and cannot diverge from the real
+    # call — a preview of a refused global must report the refusal.
+    ops.guard_set_global_variable(name, value)
     if dry_run:
         return {"dryRun": True, "wouldSet": {"name": name, "value": value}}
     return ops.set_global_variable(conn, name, value)

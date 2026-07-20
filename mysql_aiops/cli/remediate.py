@@ -13,6 +13,7 @@ from mysql_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
+    dry_run_preview,
     dry_run_print,
 )
 
@@ -31,13 +32,17 @@ def remediate_kill(
     dry_run: DryRunOption = False,
 ) -> None:
     """Terminate a session (no undo; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="kill_session",
-                      api_call="KILL CONNECTION <id>", parameters={"sessionId": session_id})
-        return
-    double_confirm("kill session", str(session_id))
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        # Through the governed call: kill_session refuses this tool's own
+        # session id, so a preview must report that rather than a green banner.
+        dry_run_preview(
+            gov.kill_session(session_id=session_id, dry_run=True, target=target),
+            operation="kill_session", api_call="KILL CONNECTION <id>",
+            parameters={"sessionId": session_id})
+        return
+    double_confirm("kill session", str(session_id))
     console.print_json(json.dumps(
         gov.kill_session(session_id=session_id, target=target), default=str))
 
@@ -50,13 +55,15 @@ def remediate_kill_query(
     dry_run: DryRunOption = False,
 ) -> None:
     """Cancel a session's running statement (no undo; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="kill_query",
-                      api_call="KILL QUERY <id>", parameters={"sessionId": session_id})
-        return
-    double_confirm("kill query on session", str(session_id))
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        dry_run_preview(
+            gov.kill_query(session_id=session_id, dry_run=True, target=target),
+            operation="kill_query", api_call="KILL QUERY <id>",
+            parameters={"sessionId": session_id})
+        return
+    double_confirm("kill query on session", str(session_id))
     console.print_json(json.dumps(
         gov.kill_query(session_id=session_id, target=target), default=str))
 
@@ -146,12 +153,16 @@ def remediate_set(
     dry_run: DryRunOption = False,
 ) -> None:
     """SET GLOBAL a server variable (reversible; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="set_global_variable",
-                      api_call=f"SET GLOBAL {name} = ...", parameters={"value": value})
-        return
-    double_confirm(f"SET GLOBAL {name} =", value)
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        # Through the governed call: set_global_variable refuses the
+        # self-affecting globals, so a preview must report that.
+        dry_run_preview(
+            gov.set_global_variable(name=name, value=value, dry_run=True, target=target),
+            operation="set_global_variable", api_call=f"SET GLOBAL {name} = ...",
+            parameters={"value": value})
+        return
+    double_confirm(f"SET GLOBAL {name} =", value)
     console.print_json(json.dumps(
         gov.set_global_variable(name=name, value=value, target=target), default=str))

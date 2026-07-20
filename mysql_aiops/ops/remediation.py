@@ -13,6 +13,18 @@ Irreversible ops (``kill_session``, ``kill_query``, ``optimize_table``,
 ``analyze_table``, ``reset_query_stats``) capture prior state for the audit
 trail but declare no undo.
 
+Two writes additionally refuse targets that would destroy their own
+reversibility (:class:`SelfLockout`):
+
+  * ``kill_session`` / ``kill_query`` refuse this connection's own session id.
+    ``ops/activity.py`` already hides it from every read (``WHERE id <>
+    CONNECTION_ID()``); the writes have to honour the same boundary, or the one
+    session an agent can reach by guessing is the one it is calling through.
+  * ``set_global_variable`` refuses a static denylist of self-affecting globals.
+    Unlike Postgres's ``ALTER SYSTEM``, ``SET GLOBAL`` takes effect IMMEDIATELY,
+    so e.g. ``init_connect`` or ``max_connections=1`` locks out every later
+    process — including the one that would replay the undo.
+
 Values (session ids, variable values) are bound parameters. The few identifiers
 that cannot be parameterised (table/index/column names, variable names) are
 validated and backtick-quoted via :mod:`mysql_aiops.ops._util` before the
@@ -28,8 +40,71 @@ from mysql_aiops.ops._util import opt, qualify, quote_ident, s
 
 _VARIABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
+# Globals whose effect is immediate AND lands on the tool's own ability to
+# reconnect. `SET GLOBAL` is not `ALTER SYSTEM`: there is no restart between the
+# write and the damage. The cached connection inside one process survives, but
+# every CLI invocation and every restarted MCP server opens a NEW connection —
+# which is exactly what an undo needs. The list is STATIC (no runtime
+# detection), so there is no fail-open case: a name is either on it or it is not.
+_SELF_AFFECTING_GLOBALS: dict[str, str] = {
+    "init_connect": (
+        "it runs on every new non-SUPER connection, so a statement that errors "
+        "(or blocks) makes each later login fail at handshake"
+    ),
+    "max_connections": "it can be set below the live connection count, refusing every new login",
+    "max_user_connections": "it caps this tool's own account, refusing its later logins",
+    "read_only": "it makes the server reject the writes an undo is made of",
+    "super_read_only": "it makes the server reject the writes an undo is made of, SUPER included",
+    "skip_networking": "it stops the server listening on TCP, the transport this tool uses",
+    "require_secure_transport": "it starts refusing every non-TLS client, this one included",
+}
+# wait_timeout / interactive_timeout are legitimate tuning knobs until they are
+# small enough that a new connection is torn down before it can do any work.
+_TIMEOUT_GLOBALS = ("wait_timeout", "interactive_timeout")
+MIN_SAFE_TIMEOUT_SECONDS = 30
+
+
+class SelfLockout(ValueError):  # noqa: N818 — teaching error, reads as a statement
+    """Refused: the operation would cut this tool off from the server it manages."""
+
 
 # ── session control (irreversible) ──────────────────────────────────────────
+
+
+def _own_session_id(conn: Any) -> int | None:
+    """This connection's own session id, or None when it cannot be determined.
+
+    ``None`` means UNKNOWN and must never be read as "it is me" — callers fail
+    open, because refusing a legitimate kill on a failed probe would be a new
+    bug, while the read path (``activity.py``) already filters the same id.
+    """
+    try:
+        own = conn.scalar("SELECT CONNECTION_ID()")
+        return int(own) if own is not None else None
+    except Exception:  # noqa: BLE001 — unknown identity, never a false "it is me"
+        return None
+
+
+def guard_kill_session(conn: Any, session_id: int, action: str = "kill_session") -> None:
+    """Raise the :class:`SelfLockout` a self-targeted kill would raise, without killing.
+
+    Called by ``kill_session`` / ``kill_query`` themselves *and* by the MCP
+    wrappers ahead of their ``dry_run`` early return, so a preview of a
+    self-kill reports the refusal instead of a green ``wouldKillSession``. Both
+    paths run this one function, so preview and real call cannot disagree.
+
+    Fails open on an undeterminable id: unknown is never treated as "it is me".
+    """
+    own = _own_session_id(conn)
+    if own is None or int(session_id) != own:
+        return
+    raise SelfLockout(
+        f"Refusing {action} on session {int(session_id)}: that is the connection "
+        f"this tool is calling through. Killing it aborts the very statement "
+        f"issuing the kill and drops the session the audit row is written from. "
+        f"list_sessions already excludes it — pick a session id from there, or "
+        f"use a separate mysql client if you really must kill this one."
+    )
 
 
 def _capture_session(conn: Any, session_id: int) -> dict:
@@ -51,7 +126,14 @@ def _capture_session(conn: Any, session_id: int) -> dict:
 
 
 def kill_session(conn: Any, session_id: int) -> dict:
-    """[WRITE] Terminate a session (KILL CONNECTION). No safe inverse."""
+    """[WRITE] Terminate a session (KILL CONNECTION). No safe inverse.
+
+    **Refuses this connection's own session id** — a kill has no undo, and
+    aiming it at the caller's own connection destroys the statement issuing it.
+    If the id cannot be determined the call proceeds (unknown is never treated
+    as "it is me").
+    """
+    guard_kill_session(conn, session_id, "kill_session")
     prior = _capture_session(conn, session_id)
     conn.execute("KILL CONNECTION %(id)s", {"id": int(session_id)})
     return {
@@ -66,7 +148,11 @@ def kill_query(conn: Any, session_id: int) -> dict:
     """[WRITE] Cancel a session's running statement (KILL QUERY). No inverse.
 
     The session stays connected; only its current statement is aborted.
+
+    **Refuses this connection's own session id** — the statement it would cancel
+    is this very call. If the id cannot be determined the call proceeds.
     """
+    guard_kill_session(conn, session_id, "kill_query")
     prior = _capture_session(conn, session_id)
     conn.execute("KILL QUERY %(id)s", {"id": int(session_id)})
     return {
@@ -268,6 +354,48 @@ def _validate_variable_name(name: str) -> str:
     return name
 
 
+def _self_affecting_reason(var_name: str, value: str) -> str | None:
+    """Why setting ``var_name`` to ``value`` locks this tool out, else None."""
+    reason = _SELF_AFFECTING_GLOBALS.get(var_name)
+    if reason is not None:
+        return reason
+    if var_name in _TIMEOUT_GLOBALS:
+        try:
+            seconds = int(str(value).strip())
+        except (TypeError, ValueError):
+            return None  # not a number — SET GLOBAL will reject it on its own
+        if seconds < MIN_SAFE_TIMEOUT_SECONDS:
+            return (
+                f"at {seconds}s a new connection is torn down before it can do any "
+                f"work (floor is {MIN_SAFE_TIMEOUT_SECONDS}s)"
+            )
+    return None
+
+
+def guard_set_global_variable(name: str, value: str) -> None:
+    """Raise the :class:`SelfLockout` ``set_global_variable`` would raise, without I/O.
+
+    Called by ``set_global_variable`` itself *and* by the MCP wrapper ahead of
+    its ``dry_run`` early return, so a preview of a denylisted global reports
+    the refusal instead of a green ``wouldSet``. The denylist is static, so the
+    preview and the real call cannot diverge and the guard costs nothing.
+
+    Normalises the name itself, so it cannot be side-stepped by case or padding
+    on either path.
+    """
+    var_name = str(name).strip().lower()
+    lockout_reason = _self_affecting_reason(var_name, value)
+    if lockout_reason is None:
+        return
+    raise SelfLockout(
+        f"Refusing SET GLOBAL {var_name}: {lockout_reason}. SET GLOBAL takes "
+        f"effect immediately, so this would lock out every later connection — "
+        f"including the one the undo needs to set it back, destroying this "
+        f"write's own reversibility. Set it in my.cnf and restart during a "
+        f"window where you have console access to recover."
+    )
+
+
 def set_global_variable(conn: Any, name: str, value: str) -> dict:
     """[WRITE] SET GLOBAL a server variable. Reversible: captures the prior value.
 
@@ -275,7 +403,15 @@ def set_global_variable(conn: Any, name: str, value: str) -> dict:
     my.cnf — or SET PERSIST on MySQL 8 — yourself); this is reported but NOT
     performed automatically. The prior value comes from SHOW GLOBAL VARIABLES
     so the harness records an undo that sets it back.
+
+    **Refuses the globals that would lock this tool out of the server**
+    (``init_connect``, ``max_connections``, ``max_user_connections``,
+    ``read_only``, ``super_read_only``, ``skip_networking``,
+    ``require_secure_transport``, and ``wait_timeout`` /
+    ``interactive_timeout`` below a 30s floor). Those take effect on the next
+    connection, which is precisely what replaying the undo requires.
     """
+    guard_set_global_variable(name, value)
     var_name = _validate_variable_name(name)
     prior = conn.query_one(
         "SHOW GLOBAL VARIABLES LIKE %(n)s", {"n": var_name}

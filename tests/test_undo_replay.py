@@ -61,17 +61,17 @@ def test_create_index_descriptor_replays_through_drop_index(fake_mysql, monkeypa
 @pytest.mark.unit
 def test_set_global_variable_descriptor_replays(fake_mysql, monkeypatch):
     fake = fake_mysql({"SHOW GLOBAL VARIABLES": [
-        {"Variable_name": "max_connections", "Value": "151"},
+        {"Variable_name": "long_query_time", "Value": "10"},
     ]})
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: fake)
 
-    result = gov.set_global_variable(name="max_connections", value="500")
-    descriptor = gov._set_global_variable_undo({"name": "max_connections"}, result)
+    result = gov.set_global_variable(name="long_query_time", value="1")
+    descriptor = gov._set_global_variable_undo({"name": "long_query_time"}, result)
     assert descriptor["tool"] == "set_global_variable"
 
     replay = gov.set_global_variable(**descriptor["params"])
-    assert replay["newValue"] == "151"
-    assert ("SET GLOBAL max_connections = %(v)s", {"v": "151"}) in fake.executed
+    assert replay["newValue"] == "10"
+    assert ("SET GLOBAL long_query_time = %(v)s", {"v": "10"}) in fake.executed
 
 
 @pytest.mark.unit

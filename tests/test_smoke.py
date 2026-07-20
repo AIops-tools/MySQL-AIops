@@ -178,7 +178,7 @@ def test_drop_index_records_undo_from_captured_definition(monkeypatch):
     recorded = {}
 
     class _Store:
-        def record(self, *, skill, tool, undo_descriptor, orig_params):
+        def record(self, *, skill, tool, undo_descriptor, orig_params, effect_verified=True):
             recorded["descriptor"] = undo_descriptor
             return "undo-1"
 
@@ -206,7 +206,7 @@ def test_create_index_undo_drops_created_name(monkeypatch):
     recorded = {}
 
     class _Store:
-        def record(self, *, skill, tool, undo_descriptor, orig_params):
+        def record(self, *, skill, tool, undo_descriptor, orig_params, effect_verified=True):
             recorded["descriptor"] = undo_descriptor
             return "undo-2"
 
@@ -226,23 +226,23 @@ def test_set_global_variable_undo_restores_prior_value(monkeypatch):
     from mcp_server.tools import remediation as rem
 
     conn = FakeMySQL({"SHOW GLOBAL VARIABLES": [
-        {"Variable_name": "max_connections", "Value": "151"},
+        {"Variable_name": "long_query_time", "Value": "10"},
     ]})
     monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
 
     recorded = {}
 
     class _Store:
-        def record(self, *, skill, tool, undo_descriptor, orig_params):
+        def record(self, *, skill, tool, undo_descriptor, orig_params, effect_verified=True):
             recorded["descriptor"] = undo_descriptor
             return "undo-3"
 
     monkeypatch.setattr(undo_mod, "get_undo_store", lambda: _Store())
 
-    result = rem.set_global_variable(name="max_connections", value="500")
+    result = rem.set_global_variable(name="long_query_time", value="1")
     assert "error" not in result
     assert recorded["descriptor"]["tool"] == "set_global_variable"
-    assert recorded["descriptor"]["params"] == {"name": "max_connections", "value": "151"}
+    assert recorded["descriptor"]["params"] == {"name": "long_query_time", "value": "10"}
 
 
 @pytest.mark.unit

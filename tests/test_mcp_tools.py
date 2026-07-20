@@ -262,7 +262,7 @@ def test_mcp_remediation_dry_runs(gov_home, monkeypatch):
     assert t_remediation.optimize_table(table="orders", dry_run=True)["dryRun"] is True
     assert t_remediation.analyze_table(table="orders", dry_run=True)["dryRun"] is True
     assert t_remediation.set_global_variable(
-        name="max_connections", value="5", dry_run=True)["dryRun"] is True
+        name="long_query_time", value="5", dry_run=True)["dryRun"] is True
     ci = t_remediation.create_index(table="orders", columns=["a"], dry_run=True)
     assert ci["wouldCreate"]["table"] == "orders"
     di = t_remediation.drop_index(table="orders", name="idx_a", dry_run=True)
@@ -299,11 +299,11 @@ def test_mcp_drop_index_confirmed_captures_definition_and_audits(gov_home, monke
 @pytest.mark.unit
 def test_mcp_set_global_variable_confirmed_records_prior(gov_home, monkeypatch):
     fake = FakeMySQL({"SHOW GLOBAL VARIABLES": [
-        {"Variable_name": "max_connections", "Value": "151"},
+        {"Variable_name": "long_query_time", "Value": "10"},
     ]})
     _bind(monkeypatch, t_remediation, fake)
-    out = t_remediation.set_global_variable(name="max_connections", value="500")
-    assert out["priorState"]["value"] == "151"
+    out = t_remediation.set_global_variable(name="long_query_time", value="1")
+    assert out["priorState"]["value"] == "10"
     sql, params = fake.executed[0]
-    assert sql == "SET GLOBAL max_connections = %(v)s" and params == {"v": "500"}
+    assert sql == "SET GLOBAL long_query_time = %(v)s" and params == {"v": "1"}
     assert _audit_tools(gov_home / "audit.db") == ["set_global_variable"]

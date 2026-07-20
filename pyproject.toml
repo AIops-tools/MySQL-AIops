@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mysql-aiops"
-version = "0.2.2"
+version = "0.3.0"
 description = "Governed AI-ops for MySQL/MariaDB DBA operations: slow-query RCA, InnoDB lock-wait & deadlock analysis, replication-lag RCA and fragmentation analysis with a built-in governance harness (audit, budget, undo, risk tiers)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "wei", email = "zhouwei008@gmail.com" }]
+authors = [{ name = "Wei Zhou", email = "zhouwei008@gmail.com" }]
 dependencies = [
     "pymysql>=1.1,<2.0",
     "typer>=0.12,<1.0",

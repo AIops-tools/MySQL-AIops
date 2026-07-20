@@ -187,13 +187,13 @@ def test_drop_index_raises_when_not_found():
 @pytest.mark.unit
 def test_set_global_variable_captures_prior_and_binds_value():
     conn = FakeMySQL({"SHOW GLOBAL VARIABLES": [
-        {"Variable_name": "max_connections", "Value": "151"},
+        {"Variable_name": "long_query_time", "Value": "10"},
     ]})
-    out = ops.set_global_variable(conn, "max_connections", "500")
-    assert out["priorState"]["value"] == "151"
+    out = ops.set_global_variable(conn, "long_query_time", "1")
+    assert out["priorState"]["value"] == "10"
     sql, params = conn.executed[0]
-    assert sql == "SET GLOBAL max_connections = %(v)s"  # value is bound
-    assert params == {"v": "500"}
+    assert sql == "SET GLOBAL long_query_time = %(v)s"  # value is bound
+    assert params == {"v": "1"}
 
 
 @pytest.mark.unit

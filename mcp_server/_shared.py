@@ -20,12 +20,28 @@ from typing import Any, Optional
 from mcp.server.fastmcp import FastMCP
 
 from mysql_aiops.config import load_config
-from mysql_aiops.connection import ConnectionManager, MySQLError
-from mysql_aiops.governance import sanitize
+from mysql_aiops.connection import ConnectionManager, MySQLConnectionLostError, MySQLError
+from mysql_aiops.governance import mark_unknown, sanitize
 
 logger = logging.getLogger(__name__)
 
 _DOCTOR_HINT = "Run 'mysql-aiops doctor' to verify connectivity and credentials."
+
+
+# Long enough to carry the remediation sentence. These messages teach the
+# caller what to do instead, and that clause comes last — a 300-char cap cut
+# it off silently on every refusal long enough to need one.
+_ERROR_MAX = 800
+
+
+# Failures that leave the statement's fate genuinely undetermined. Raised
+# only from the statement-executing path, so it means an ESTABLISHED link
+# died mid-statement — not that the server was unreachable. The driver gives
+# both the same class, so the connection layer discriminates by position and
+# raises a dedicated class; this layer only has to recognise it.
+# InnoDB rolls back on connection loss, so usually nothing landed — but a
+# COMMIT whose acknowledgement was lost did land.
+_UNDETERMINED_ERRORS = (MySQLConnectionLostError,)
 
 
 def _safe_error(exc: Exception, tool: str) -> str:
@@ -41,7 +57,7 @@ def _safe_error(exc: Exception, tool: str) -> str:
         MySQLError,
     )
     if isinstance(exc, _passthrough):
-        return sanitize(str(exc), 300)
+        return sanitize(str(exc), _ERROR_MAX)
     return f"{type(exc).__name__}: operation failed."
 
 
@@ -65,7 +81,13 @@ def tool_errors(shape: str = "dict") -> Callable:
                     return [{"error": msg, "hint": _DOCTOR_HINT}]
                 if shape == "str":
                     return f"Error: {msg} {_DOCTOR_HINT}"
-                return {"error": msg, "hint": _DOCTOR_HINT}
+                payload = {"error": msg, "hint": _DOCTOR_HINT}
+                # Flatten the exception into a dict and its type is gone
+                # for good — so classify here, while it is still known,
+                # whether the operation may nonetheless have taken effect.
+                if isinstance(e, _UNDETERMINED_ERRORS):
+                    return mark_unknown(payload)
+                return payload
 
         return wrapper
 

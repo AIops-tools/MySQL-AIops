@@ -1,9 +1,13 @@
 """CLI ``remediate`` command bodies — dry-run previews and abort paths.
 
-The dry-run branch of every remediate command returns *before* importing the
-governed twin, so these exercise the CLI argument wiring and the
-``dry_run_print`` preview with no database or governance side effects. A couple
-of abort-on-confirm cases exercise the ``double_confirm`` gate.
+Most remediate commands return from the dry-run branch *before* importing the
+governed twin, so they exercise the CLI argument wiring and the
+``dry_run_print`` preview with no database or governance side effects. The three
+self-lockout-guarded commands (``kill``, ``kill-query``, ``set``) are the
+exception: their preview routes through the governed twin so the guard runs,
+because a preview of a call that will be refused must report the refusal rather
+than a green banner. A dry_run MAY read; it must never write — and these still
+do not. A couple of abort-on-confirm cases exercise the ``double_confirm`` gate.
 """
 
 from __future__ import annotations
@@ -12,23 +16,49 @@ import pytest
 from typer.testing import CliRunner
 
 from mysql_aiops.cli import app
+from tests.conftest import FakeMySQL
 
 runner = CliRunner()
 
 
+@pytest.fixture
+def guarded_conn(monkeypatch):
+    """Wire the governed remediation tools to a fake whose own session id is 1."""
+    import mcp_server.tools.remediation as gov
+
+    fake = FakeMySQL(
+        {"FROM information_schema.processlist": [{"id": 42, "user": "app"}],
+         "SHOW GLOBAL VARIABLES": [{"Variable_name": "long_query_time", "Value": "10"}]},
+        scalars={"CONNECTION_ID()": 1},
+    )
+    monkeypatch.setattr(gov, "_get_connection", lambda target=None: fake)
+    return fake
+
+
 @pytest.mark.unit
-def test_remediate_kill_dry_run():
+def test_remediate_kill_dry_run(guarded_conn):
     result = runner.invoke(app, ["remediate", "kill", "42", "--dry-run"])
     assert result.exit_code == 0, result.output
     assert "DRY-RUN" in result.output and "kill_session" in result.output
     assert "sessionId = 42" in result.output
+    assert guarded_conn.executed == [], "a dry-run must never write"
 
 
 @pytest.mark.unit
-def test_remediate_kill_query_dry_run():
+def test_remediate_kill_dry_run_reports_a_self_targeted_refusal(guarded_conn):
+    """The preview must not show a green banner for a call that will be refused."""
+    result = runner.invoke(app, ["remediate", "kill", "1", "--dry-run"])
+    assert result.exit_code == 1, result.output
+    assert "DRY-RUN" not in result.output
+    assert "calling through" in result.output
+
+
+@pytest.mark.unit
+def test_remediate_kill_query_dry_run(guarded_conn):
     result = runner.invoke(app, ["remediate", "kill-query", "7", "--dry-run"])
     assert result.exit_code == 0, result.output
     assert "kill_query" in result.output and "sessionId = 7" in result.output
+    assert guarded_conn.executed == [], "a dry-run must never write"
 
 
 @pytest.mark.unit
@@ -68,11 +98,21 @@ def test_remediate_drop_index_dry_run():
 
 
 @pytest.mark.unit
-def test_remediate_set_dry_run():
-    result = runner.invoke(app, ["remediate", "set", "max_connections", "500", "--dry-run"])
+def test_remediate_set_dry_run(guarded_conn):
+    result = runner.invoke(app, ["remediate", "set", "long_query_time", "1", "--dry-run"])
     assert result.exit_code == 0, result.output
     assert "set_global_variable" in result.output
-    assert "value = 500" in result.output
+    assert "value = 1" in result.output
+    assert guarded_conn.executed == [], "a dry-run must never write"
+
+
+@pytest.mark.unit
+def test_remediate_set_dry_run_reports_a_denylisted_global(guarded_conn):
+    """max_connections=1 locks out every later connection, undo included."""
+    result = runner.invoke(app, ["remediate", "set", "max_connections", "1", "--dry-run"])
+    assert result.exit_code == 1, result.output
+    assert "DRY-RUN" not in result.output
+    assert "my.cnf" in result.output
 
 
 @pytest.mark.unit

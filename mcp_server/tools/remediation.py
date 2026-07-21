@@ -1,7 +1,7 @@
 """MySQL maintenance MCP tools (guarded writes).
 
 The state-changing tools. Every one is wrapped with the governance harness
-(audit + graduated approval tier) and takes a ``dry_run`` preview. Reversible
+(audit + risk-tier tagging) and takes a ``dry_run`` preview. Reversible
 writes pass an ``undo=`` callback that turns the fetched before-state into an
 inverse descriptor the harness records; irreversible ones record none.
 

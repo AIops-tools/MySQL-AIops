@@ -49,10 +49,11 @@ Every MCP tool runs through the bundled `@governed_tool` harness
 - **Token/runaway budget** — hard ceilings (`MYSQL_MAX_TOOL_CALLS` /
   `MYSQL_MAX_TOOL_SECONDS` — the env-var names the bundled harness reads) plus
   an on-by-default guard that trips a tight poll/retry loop.
-- **Graduated risk tiers** — **secure by default**: with no
-  `~/.mysql-aiops/rules.yaml`, high/critical writes are denied unless
-  `MYSQL_AUDIT_APPROVED_BY` names an approver (`MYSQL_AUDIT_RATIONALE` for
-  why); `mysql-aiops init` seeds an explicit starter rules.yaml.
+- **Risk tiers** — a descriptive label on the audit row derived from each
+  tool's declared `risk_level`; it gates nothing. Whether a write is permitted
+  is the connecting account's permissions or the agent's judgement, not this
+  harness. `MYSQL_AUDIT_APPROVED_BY` / `MYSQL_AUDIT_RATIONALE` are optional
+  annotations recorded on the audit row — never required, never blocking.
 - **Undo-token recording** — reversible writes fetch the **real before-state
   first** and record a faithful inverse (`create_index`↔`drop_index`, where
   drop rebuilds the definition from `SHOW CREATE TABLE`;

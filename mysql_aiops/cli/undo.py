@@ -18,7 +18,7 @@ from mysql_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
 )
 
 undo_app = typer.Typer(
@@ -51,11 +51,16 @@ def undo_apply_cmd(
     from mcp_server.tools import undo as gov
 
     if dry_run:
+        # An unknown / already-applied token arrives as {"error": ...}. Reading
+        # `wouldApply` off that dict yields a green "inverse: ?" banner for a
+        # call that cannot run — dry_run_preview prints the refusal instead.
         preview = gov.undo_apply(undo_id=undo_id, dry_run=True, target=target)
-        dry_run_print(
+        would = preview.get("wouldApply") or {} if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview,
             operation="undo_apply",
-            api_call=f"inverse: {preview.get('wouldApply', {}).get('tool', '?')}",
-            parameters=preview.get("wouldApply", {}).get("params", {}),
+            api_call=f"inverse: {would.get('tool', '?')}",
+            parameters=would.get("params", {}),
         )
         return
     double_confirm("apply undo", undo_id)

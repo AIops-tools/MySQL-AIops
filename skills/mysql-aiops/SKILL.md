@@ -23,7 +23,7 @@ compatibility: >
   All write operations are audited to a local SQLite DB under ~/.mysql-aiops/ (relocatable via MYSQL_AIOPS_HOME).
   Credentials: the MySQL account password is stored ENCRYPTED in ~/.mysql-aiops/secrets.enc (Fernet/AES-128 + scrypt-derived key) — never plaintext on disk. Run 'mysql-aiops init' to onboard, or 'mysql-aiops secret set <target>' to add one. The store is unlocked by a master password from MYSQL_AIOPS_MASTER_PASSWORD (non-interactive/MCP/CI) or an interactive prompt (CLI on a TTY). A legacy plaintext env var MYSQL_<TARGET_NAME_UPPER>_PASSWORD is still honoured as a fallback with a deprecation warning (migrate with 'mysql-aiops secret migrate'). The password is passed to pymysql.connect at connect time and held only in memory; it is never logged or echoed.
   SQL safety: all values are bound query parameters; the few identifiers that cannot be parameterised (schema/table/index/column/variable names, ORDER BY columns) are validated against a strict identifier charset / allow-lists and backtick-quoted before interpolation. EXPLAIN rejects multi-statement input; the drop_index undo replay path is shape-gated to CREATE [UNIQUE] INDEX statements.
-  State-changing operations require double confirmation at the CLI layer and support --dry-run. All write tools pass through the @governed_tool decorator (pre-check + budget guard + audit + risk-tier gate) and take a dry_run preview. Reversible writes fetch the real before-state first and record a faithful inverse (create_index↔drop_index, where drop rebuilds the definition from SHOW CREATE TABLE; set_global_variable restores the prior value); irreversible ops (kill session/query, optimize/analyze, reset stats) record prior state only.
+  State-changing operations require double confirmation at the CLI layer and support --dry-run. All write tools pass through the @governed_tool decorator (budget/runaway guard + audit + risk-tier label — it records, not authorizes) and take a dry_run preview. Reversible writes fetch the real before-state first and record a faithful inverse (create_index↔drop_index, where drop rebuilds the definition from SHOW CREATE TABLE; set_global_variable restores the prior value); irreversible ops (kill session/query, optimize/analyze, reset stats) record prior state only.
   Webhooks: none — no outbound network calls beyond the configured MySQL connection.
   TLS: ssl_mode follows MySQL client semantics (default preferred); set verify_ca/verify_identity (with ssl_ca) on untrusted networks.
   Transitive dependencies: PyMySQL (pure-Python MySQL driver) and the MCP SDK. No post-install scripts or background services.
@@ -34,7 +34,7 @@ compatibility: >
 
 > **Disclaimer**: Community-maintained open-source project, **not affiliated with, endorsed by, or sponsored by Oracle Corporation or the MariaDB Foundation.** "MySQL" and "MariaDB" trademarks belong to their owners. Source at [github.com/AIops-tools/MySQL-AIops](https://github.com/AIops-tools/MySQL-AIops) under the MIT license.
 
-Governed MySQL / MariaDB DBA operations — **35 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.mysql-aiops/`, policy engine, token/runaway budget guard, undo-token recording, and graduated-autonomy risk tiers. The account password is stored **encrypted** (`~/.mysql-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
+Governed MySQL / MariaDB DBA operations — **35 MCP tools**, every one wrapped with the bundled `@governed_tool` harness: a local unified audit log under `~/.mysql-aiops/`, token/runaway budget guard, undo-token recording, and descriptive risk-tier labels. The account password is stored **encrypted** (`~/.mysql-aiops/secrets.enc`, Fernet + scrypt) — never plaintext on disk.
 
 > **Standalone**: the governance harness is bundled in the package (`mysql_aiops.governance`) — mysql-aiops has no external skill-family dependency. Behaviour is covered by a mock-based test suite; `docs/VERIFICATION.md` is the checklist for a live run against a real MySQL / MariaDB server.
 
@@ -192,9 +192,15 @@ Pass data straight to the analysis tools — `slow_query_rca(statements=[...])`,
 
 ## Governance & Safety
 
-- Every tool is audited to `~/.mysql-aiops/audit.db` (relocatable via `MYSQL_AIOPS_HOME`).
-- High-risk ops can require a named approver: set `MYSQL_AUDIT_APPROVED_BY` and `MYSQL_AUDIT_RATIONALE` (the env-var names the bundled harness reads).
-- **Secure by default**: with no `~/.mysql-aiops/rules.yaml`, high/critical operations are denied unless `MYSQL_AUDIT_APPROVED_BY` names an approver. `mysql-aiops init` seeds a starter rules.yaml; an operator-authored rules file is honoured as-is.
+The skill delivers reads and writes and records them; it does **not** decide whether a write is
+permitted. That is your agent's judgement, or the permission of the account you connect it with
+(point it at a MySQL/MariaDB account granted only SELECT / PROCESS / REPLICATION CLIENT and no
+write privileges (no INSERT/UPDATE/DELETE/DDL) — writes then fail at the server). There is no
+read-only switch, policy file, or approval gate.
+
+- **Audit is the guarantee, and it is not bypassable.** Every operation — MCP and CLI alike — is logged to `~/.mysql-aiops/audit.db` (relocatable via `MYSQL_AIOPS_HOME`): params, result, status, duration, and the risk tier. The CLI writes the same row the MCP path does.
+- `MYSQL_AUDIT_APPROVED_BY` / `MYSQL_AUDIT_RATIONALE` are optional annotations recorded on the audit row (who/why); they are never required and never block.
+- **Runaway guard** — a safety backstop, not authorization: the same call looped in a tight window trips a circuit breaker. Disable with `MYSQL_RUNAWAY_MAX=0`.
 - Writes support `--dry-run` / `dry_run=True` and double confirmation at the CLI.
 - Reversible writes fetch the real before-state and record an inverse descriptor; irreversible ops (kill session/query, optimize/analyze, reset stats) record prior state only.
 - All values are bound query parameters; identifiers that cannot be parameterised are validated and backtick-quoted.

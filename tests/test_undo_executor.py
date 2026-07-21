@@ -112,7 +112,7 @@ def test_undo_apply_unregistered_inverse_errors(gov_home):
 @pytest.mark.unit
 def test_cli_undo_apply_dry_run_renders(gov_home):
     """The `undo apply --dry-run` CLI path must render without error — guards
-    against dry_run_print signature drift across tools (api_call vs detail)."""
+    against dry_run_preview signature drift across tools (api_call vs detail)."""
     from typer.testing import CliRunner
 
     from mysql_aiops.cli import app
@@ -123,6 +123,26 @@ def test_cli_undo_apply_dry_run_renders(gov_home):
     assert "DRY-RUN" in result.output
     assert _CALLS == []
     assert undo_mod.get_undo_store().get(uid)["status"] == "recorded"
+
+
+@pytest.mark.unit
+def test_cli_undo_apply_dry_run_refuses_an_unknown_token(gov_home):
+    """A token that cannot be applied must not preview as if it could.
+
+    ``undo_apply`` returns {"error": ...} for an unknown id. Reading
+    ``wouldApply`` off that dict produced a green banner reading
+    "inverse: ?" — a preview claiming a plan exists for a token that does not.
+    """
+    from typer.testing import CliRunner
+
+    from mysql_aiops.cli import app
+
+    result = CliRunner().invoke(app, ["undo", "apply", "deadbeef", "--dry-run"])
+    assert result.exit_code == 1, result.output
+    assert "DRY-RUN" not in result.output
+    assert "inverse: ?" not in result.output
+    assert "Unknown undo id" in result.output
+    assert _CALLS == []
 
 
 @pytest.mark.unit

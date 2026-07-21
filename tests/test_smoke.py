@@ -13,7 +13,7 @@ import importlib
 import pytest
 from typer.testing import CliRunner
 
-from tests.conftest import FakeMySQL
+from tests.conftest import FakeMySQL, mutating_statements
 
 EXPECTED_TOOLS = {
     # server
@@ -246,14 +246,23 @@ def test_set_global_variable_undo_restores_prior_value(monkeypatch):
 
 
 @pytest.mark.unit
-def test_dry_run_gates_destructive_cli():
-    """remediate drop-index --dry-run must not touch the connection."""
+def test_dry_run_gates_destructive_cli(monkeypatch):
+    """remediate drop-index --dry-run previews without dropping anything.
+
+    The preview routes through the governed twin, so it DOES open a connection
+    (that is how the twin's guards get to run) — what it must never do is issue
+    the DROP.
+    """
+    from mcp_server.tools import remediation as rem
     from mysql_aiops.cli import app
 
+    conn = FakeMySQL()
+    monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
     runner = CliRunner()
     result = runner.invoke(app, ["remediate", "drop-index", "orders", "idx_x", "--dry-run"])
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.output
     assert "DRY-RUN" in result.output
+    assert mutating_statements(conn) == [], "a dry-run must never write"
 
 
 @pytest.mark.unit
@@ -265,3 +274,33 @@ def test_dry_run_mcp_write_does_not_execute(monkeypatch):
     out = rem.optimize_table(table="shop.orders", dry_run=True)
     assert out.get("dryRun") is True
     assert conn.executed == [] and conn.queried == []
+
+
+@pytest.mark.unit
+def test_risk_level_agrees_with_read_write_docstring_tag():
+    """The two write-markers must never drift apart.
+
+    A tool's ``risk_level`` decides its audit tier and whether it gets dry-run /
+    undo handling; its ``[READ]``/``[WRITE]`` docstring tag is what the docs and
+    capability tables are built from. If a ``[WRITE]`` were left ``risk_level=low``
+    it would be audited as a read and skip the write machinery — this test caught
+    16 such mislabels line-wide once, so it is kept even though read-only mode
+    (its original motivation) is gone.
+    """
+    from mcp_server import server
+
+    untagged, mismatched = [], []
+    for name, tool in server.mcp._tool_manager._tools.items():
+        doc = (tool.fn.__doc__ or "").lstrip()
+        if doc.startswith("[READ]"):
+            tagged_as_read = True
+        elif doc.startswith("[WRITE]"):
+            tagged_as_read = False
+        else:
+            untagged.append(name)
+            continue
+        if tagged_as_read != (getattr(tool.fn, "_risk_level", "low") == "low"):
+            mismatched.append(name)
+
+    assert not untagged, f"tools missing a [READ]/[WRITE] docstring tag: {untagged}"
+    assert not mismatched, f"risk_level disagrees with the docstring tag: {mismatched}"

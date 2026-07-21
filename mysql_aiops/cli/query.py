@@ -13,7 +13,7 @@ from mysql_aiops.cli._common import (
     cli_errors,
     console,
     double_confirm,
-    dry_run_print,
+    dry_run_preview,
     get_connection,
 )
 
@@ -68,13 +68,15 @@ def query_explain(
 def query_reset(target: TargetOption = None, dry_run: DryRunOption = False) -> None:
     """Reset statement-digest accumulators (irreversible; dry-run + confirm).
 
-    Real execution is delegated to the ``@governed_tool``-wrapped MCP function
-    so the reset is audited on the same governance path as MCP calls.
+    Both the preview and the real execution are delegated to the
+    ``@governed_tool``-wrapped MCP function, so the reset is audited on the same
+    governance path as MCP calls — the preview included.
     """
     from mcp_server.tools import queries as gov
 
     if dry_run:
-        dry_run_print(
+        dry_run_preview(
+            gov.reset_query_stats(dry_run=True, target=target),
             operation="reset_query_stats",
             api_call="TRUNCATE TABLE performance_schema.events_statements_summary_by_digest",
         )

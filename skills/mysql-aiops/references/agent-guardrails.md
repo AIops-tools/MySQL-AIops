@@ -11,14 +11,17 @@ harness is a guarantee. Anything below that we could move into the harness, we d
 
 ## What the tool now enforces — do not waste prompt budget on these
 
+Authorization is not this tool's job — decide it via the account you connect with or the
+agent's prompt, not via a switch this skill provides. See below for the account-side way to
+get a read-only setup.
+
 | You might be tempted to prompt | Why you don't need to |
 |---|---|
-| "Work read-only, never change the database" | Set `MYSQL_READ_ONLY=1`. The nine write tools (`create_index`, `drop_index`, `kill_query`, `kill_session`, `optimize_table`, `analyze_table`, `set_global_variable`, `reset_query_stats`, `undo_apply`) are then **not registered at all** — they never appear in the tool list, so the model cannot call one even if it tries. The `@governed_tool` harness independently refuses writes, so the CLI is covered too. |
 | "Never write SQL that modifies data" | The tool exposes no arbitrary-SQL surface at all. Every statement is built from a fixed template; identifiers are validated against a strict charset and backtick-quoted, and values are always bound as query parameters. `explain_query` runs `EXPLAIN`, not your statement. |
 | "Don't invent a value when a field is missing" | A NULL column comes back as `null`, never as `""`. A sleeping session's `query` is `null` (it is running nothing), not blank; MariaDB's absent `gtid_mode` is `null`, not `""`. |
 | "Tell me if the output was cut off" | `top_queries`, `table_sizes`, `table_fragmentation` and `table_status` return `{"statements"/"tables": [...], "returned": N, "limit": L, "truncated": true/false}`. Truncation is measured — one extra row is requested — not guessed from a length coincidence. |
 | "Preserve the ordering / tell me what's most urgent" | `slow_query_rca`, `lock_wait_rca` and `replication_lag_rca` rank findings worst-first with the measured number attached. Priority is in the payload, not implied by list position. |
-| "Confirm before anything destructive" | `drop_index`, `kill_query`/`kill_session` and `optimize_table` require a `--dry-run`-able preview plus double confirmation at the CLI, and a named approver (`MYSQL_AUDIT_APPROVED_BY`) for high-risk tiers. `drop_index` captures the index's `SHOW CREATE` definition first, so the undo token can recreate it exactly. |
+| "Confirm before anything destructive" | `drop_index`, `kill_query`/`kill_session` and `optimize_table` require a `--dry-run`-able preview plus double confirmation at the CLI. `drop_index` captures the index's `SHOW CREATE` definition first, so the undo token can recreate it exactly. |
 | "Log what you did" | Every governed call is audited to `~/.mysql-aiops/audit.db` regardless of what the model says it did. |
 
 ## What still needs a prompt
@@ -66,19 +69,20 @@ SCOPE
 
 ## Recommended setup for a local model
 
+Point the tool at a read-only database account until you trust the setup — that is where
+the guarantee actually lives, not in a switch this skill provides:
+
 ```bash
-# Read-only until you trust the setup — this is enforced, not advisory.
-export MYSQL_READ_ONLY=1
 mysql-aiops doctor
 ```
 
-Best paired with a database account that is itself read-only — defence in depth,
-so a bug in this tool cannot do what the grant does not allow. Then, when you are
-ready to allow writes, unset it and set an approver so the high-risk tier has an
-accountable name on it:
+Grant the connecting account only `SELECT`, `PROCESS` and `REPLICATION CLIENT` (no
+`INSERT`/`UPDATE`/`DELETE`/DDL); any write tool the model calls will then fail at the server.
+When you are ready to allow writes, grant the account write privileges and, if you want a
+name on the audit trail, set an approver annotation (optional — it is recorded, never
+required):
 
 ```bash
-unset MYSQL_READ_ONLY
 export MYSQL_AUDIT_APPROVED_BY="your.name@example.com"
 export MYSQL_AUDIT_RATIONALE="index cleanup, change ticket DB-4412"
 ```

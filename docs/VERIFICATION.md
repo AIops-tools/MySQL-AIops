@@ -19,14 +19,13 @@ Exercised end-to-end against a real **MySQL 8.4.10** server (Docker), with a
   examined): correctly classified `full scan / no index used` at
   `noIndexUsedPct 100.0%`, citing the measured number.
 - Governance loop end-to-end: `create_index` via the MCP tool actually created
-  the index, the audit row landed in `audit.db` with approver + rationale, an
-  undo token was recorded with `drop_index` as the inverse, and `undo_apply`
-  really dropped it — capturing the exact `CREATE INDEX` definition as
-  `priorState` so the undo is itself reversible.
+  the index, the audit row landed in `audit.db` with the optional approver +
+  rationale annotation set, an undo token was recorded with `drop_index` as
+  the inverse, and `undo_apply` really dropped it — capturing the exact
+  `CREATE INDEX` definition as `priorState` so the undo is itself reversible.
 - `remediate ... --dry-run` made no change (verified against `SHOW INDEX`).
-- Read-only mode: `MYSQL_READ_ONLY=1` took the registry from 35 tools to 26,
-  and an in-process write call was refused by the harness with a teaching
-  message — both layers confirmed on a live server.
+- The harness authorizes nothing — there is no read-only, deny-rule, or
+  approver gate to test.
 
 **A real bug was found and fixed by this run**: `server databases` crashed with
 `TypeError: Object of type Decimal is not JSON serializable`. MySQL returns

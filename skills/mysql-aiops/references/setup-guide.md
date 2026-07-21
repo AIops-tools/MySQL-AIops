@@ -97,9 +97,9 @@ export MYSQL_AIOPS_MASTER_PASSWORD='your-master-password'
 
 State lives under `~/.mysql-aiops/` (relocate with `MYSQL_AIOPS_HOME`):
 
-- `audit.db` — every tool call (SQLite), with risk tier, approver, rationale
-- `rules.yaml` — policy: deny rules, maintenance windows, approval tiers
-  (seeded by `init` with a high-risk-requires-approver dual tier)
+- `audit.db` — every tool call (SQLite), with risk tier and an optional approver/rationale
+  annotation (`MYSQL_AUDIT_APPROVED_BY` / `MYSQL_AUDIT_RATIONALE`) if you set one — never
+  required, never blocking
 - `undo.db` — inverse descriptors for reversible writes (e.g. `drop_index`)
 - budget / runaway guard — caps cumulative tool calls and wall-time; trips on
   tight poll/retry loops

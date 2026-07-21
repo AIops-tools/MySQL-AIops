@@ -14,7 +14,6 @@ from mysql_aiops.cli._common import (
     console,
     double_confirm,
     dry_run_preview,
-    dry_run_print,
 )
 
 remediate_app = typer.Typer(
@@ -76,12 +75,14 @@ def remediate_optimize(
     dry_run: DryRunOption = False,
 ) -> None:
     """OPTIMIZE TABLE (rebuild, reclaim data_free; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="optimize_table", api_call=f"OPTIMIZE TABLE {table}")
-        return
-    double_confirm("OPTIMIZE TABLE", table)
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        dry_run_preview(
+            gov.optimize_table(table=table, dry_run=True, target=target),
+            operation="optimize_table", api_call=f"OPTIMIZE TABLE {table}")
+        return
+    double_confirm("OPTIMIZE TABLE", table)
     console.print_json(json.dumps(gov.optimize_table(table=table, target=target), default=str))
 
 
@@ -93,12 +94,14 @@ def remediate_analyze(
     dry_run: DryRunOption = False,
 ) -> None:
     """ANALYZE TABLE (refresh index statistics; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="analyze_table", api_call=f"ANALYZE TABLE {table}")
-        return
-    double_confirm("ANALYZE TABLE", table)
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        dry_run_preview(
+            gov.analyze_table(table=table, dry_run=True, target=target),
+            operation="analyze_table", api_call=f"ANALYZE TABLE {table}")
+        return
+    double_confirm("ANALYZE TABLE", table)
     console.print_json(json.dumps(gov.analyze_table(table=table, target=target), default=str))
 
 
@@ -113,13 +116,20 @@ def remediate_create_index(
     dry_run: DryRunOption = False,
 ) -> None:
     """Create an index (reversible; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="create_index", api_call=f"CREATE INDEX ON {table}",
-                      parameters={"columns": columns, "name": name, "unique": unique})
-        return
-    double_confirm("create index on", table)
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        preview = gov.create_index(table=table, columns=columns, name=name,
+                                   unique=unique, dry_run=True, target=target)
+        # Prefer what the governed call says it would create over re-stating the
+        # arguments; the banner then cannot drift from the tool's own answer.
+        would = preview.get("wouldCreate") or {} if isinstance(preview, dict) else {}
+        dry_run_preview(
+            preview, operation="create_index", api_call=f"CREATE INDEX ON {table}",
+            parameters={"columns": would.get("columns", columns),
+                        "name": would.get("name", name), "unique": unique})
+        return
+    double_confirm("create index on", table)
     result = gov.create_index(table=table, columns=columns, name=name, unique=unique,
                               target=target)
     console.print_json(json.dumps(result, default=str))
@@ -134,12 +144,14 @@ def remediate_drop_index(
     dry_run: DryRunOption = False,
 ) -> None:
     """Drop an index (reversible; captures the definition first; dry-run + confirm)."""
-    if dry_run:
-        dry_run_print(operation="drop_index", api_call=f"DROP INDEX {name} ON {table}")
-        return
-    double_confirm("drop index", f"{name} on {table}")
     from mcp_server.tools import remediation as gov
 
+    if dry_run:
+        dry_run_preview(
+            gov.drop_index(table=table, name=name, dry_run=True, target=target),
+            operation="drop_index", api_call=f"DROP INDEX {name} ON {table}")
+        return
+    double_confirm("drop index", f"{name} on {table}")
     console.print_json(json.dumps(
         gov.drop_index(table=table, name=name, target=target), default=str))
 

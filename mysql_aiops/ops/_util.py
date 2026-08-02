@@ -77,7 +77,7 @@ def as_int(value: Any) -> int | None:
     and a zero count are different facts, and collapsing them is exactly the
     misreporting the return contract exists to prevent.
     """
-    if value is None:
+    if value is None or isinstance(value, bool):  # bool subclasses int; not a quantity
         return None
     try:
         return int(value)

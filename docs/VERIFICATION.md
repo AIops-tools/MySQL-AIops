@@ -38,7 +38,22 @@ models the driver's real types.
 - **MariaDB** — the flavor branch (`SHOW SLAVE STATUS`,
   `information_schema.innodb_lock_waits`) is unit-tested only. This is now the
   largest remaining gap in this repo.
-- **Replication** (`replication_lag_rca`, `repl status` against a real replica)
-  — the verified instance was standalone.
+- ~~**Replication** (`replication_lag_rca`, `repl status` against a real replica)~~
+  — **closed 2026-08-03 against a real MySQL 8.4.11 primary/replica pair with
+  GTID replication. No defects found.** Recorded because a clean result is
+  evidence too:
+  - `doctor` identified each end correctly (`role: replica (seconds behind
+    source: 0)` vs `primary/standalone`); `repl status` returned the full
+    record (GTID sets, relay-log space, thread states) and the primary side
+    listed its connected downstream replica.
+  - A **deliberate `SOURCE_DELAY=120`** was reported as *"intentional apply
+    delay configured"*, not as a lag incident — the distinction that decides
+    whether anyone gets paged.
+  - Replication was then genuinely **broken** by colliding a row written
+    directly on the replica with one replicated from the primary
+    (`Last_SQL_Errno: 1062`). The RCA reported `sqlThreadRunning: false`, named
+    duplicate-key/schema divergence as the cause, and advised repairing rather
+    than skipping the event. `secondsBehindSource` came back **null, not 0** —
+    the difference between "no lag" and "unknown while stopped".
 - **Lock waits** (`lock_wait_rca`) — needs deliberately contended transactions.
 - Privilege-degradation paths and `performance_schema = OFF` behaviour.

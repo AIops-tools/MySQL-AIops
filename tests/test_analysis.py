@@ -6,6 +6,11 @@ import pytest
 
 from mysql_aiops.ops import analysis
 
+# Verbatim shape of real `SHOW ENGINE INNODB STATUS` output (MySQL 8.4.11, from
+# a deadlock deliberately produced on a live server). The previous fixture was
+# idealised — the statement followed the TRANSACTION header directly — so the
+# parser was never exercised against the bookkeeping lines every real server
+# emits, and folded them into the "query" field.
 _INNODB_STATUS = """
 =====================================
 2026-07-17 12:00:00 INNODB MONITOR OUTPUT
@@ -13,18 +18,106 @@ _INNODB_STATUS = """
 ------------------------
 LATEST DETECTED DEADLOCK
 ------------------------
-2026-07-17 11:58:03
+2026-08-04 05:25:29 136464230757952
 *** (1) TRANSACTION:
 TRANSACTION 4213, ACTIVE 5 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s), undo log entries 1
+MySQL thread id 30, OS thread handle 136464332559936, query id 106 localhost root updating
 UPDATE orders SET status='x' WHERE id=1
+
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 2 page no 4 n bits 72 index PRIMARY of table `labdb`.`orders`
+Record lock, heap no 2 PHYSICAL RECORD: n_fields 5; compact format; info bits 0
+
 *** (2) TRANSACTION:
 TRANSACTION 4214, ACTIVE 4 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s), undo log entries 1
+MySQL thread id 31, OS thread handle 136464332559111, query id 107 localhost root updating
 UPDATE orders SET status='y' WHERE id=2
 *** WE ROLL BACK TRANSACTION (2)
 ------------
 TRANSACTIONS
 ------------
 """
+
+# Same deadlock without the "MySQL thread id" anchor line, to pin the fallback.
+_INNODB_STATUS_NO_THREAD_LINE = """
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+2026-07-17 11:58:03
+*** (1) TRANSACTION:
+TRANSACTION 4213, ACTIVE 5 sec starting index read
+mysql tables in use 1, locked 1
+UPDATE orders SET status='x' WHERE id=1
+*** WE ROLL BACK TRANSACTION (1)
+------------
+TRANSACTIONS
+------------
+"""
+
+
+@pytest.mark.unit
+def test_deadlock_query_excludes_innodb_bookkeeping():
+    """The `query` field must hold the statement, not InnoDB's own counters.
+
+    Measured against a real MySQL 8.4 deadlock: every transaction block carries
+    "mysql tables in use ...", "LOCK WAIT ... heap size ..." and "MySQL thread
+    id ..." lines between the header and the statement. Folding those in
+    produced a "query" beginning "mysql tables in use 1, locked 1 LOCK WAIT 3
+    lock struct(s), heap size 1128, ..." — text a model would quote back as SQL.
+    """
+    out = analysis.parse_last_deadlock(_INNODB_STATUS)
+    assert [t["query"] for t in out["transactions"]] == [
+        "UPDATE orders SET status='x' WHERE id=1",
+        "UPDATE orders SET status='y' WHERE id=2",
+    ]
+    assert out["victim"] == 2
+
+
+@pytest.mark.unit
+def test_deadlock_detected_at_is_a_timestamp_not_a_thread_handle():
+    """MySQL 8.x stamps "<timestamp> <thread handle>"; only the time is the time."""
+    out = analysis.parse_last_deadlock(_INNODB_STATUS)
+    assert out["detectedAt"] == "2026-08-04 05:25:29"
+
+
+@pytest.mark.unit
+def test_deadlock_query_falls_back_without_the_thread_id_anchor():
+    out = analysis.parse_last_deadlock(_INNODB_STATUS_NO_THREAD_LINE)
+    assert out["transactions"][0]["query"] == "UPDATE orders SET status='x' WHERE id=1"
+
+
+# MariaDB names ITSELF on the thread-id line — verbatim from a real deadlock on
+# MariaDB 11.8. Anchoring only on the MySQL spelling made this fall through to
+# the fallback, which reported the whole thread-id line as the query.
+_INNODB_STATUS_MARIADB = """
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+2026-08-04 05:29:15 0x7023bd5196c0
+*** (1) TRANSACTION:
+TRANSACTION 25, ACTIVE 4 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 3 lock struct(s), heap size 1120, 2 row lock(s), undo log entries 1
+MariaDB thread id 6, OS thread handle 123298802407104, query id 12 localhost root Updating
+UPDATE accounts SET balance=balance-1 WHERE id=1
+*** WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 8 page no 3 n bits 320 index PRIMARY of table `labdb`.`accounts`
+*** WE ROLL BACK TRANSACTION (1)
+------------
+TRANSACTIONS
+------------
+"""
+
+
+@pytest.mark.unit
+def test_deadlock_query_handles_mariadbs_own_thread_id_spelling():
+    out = analysis.parse_last_deadlock(_INNODB_STATUS_MARIADB)
+    assert out["transactions"][0]["query"] == "UPDATE accounts SET balance=balance-1 WHERE id=1"
+    assert out["detectedAt"] == "2026-08-04 05:29:15"  # hex thread handle stripped
 
 
 @pytest.mark.unit

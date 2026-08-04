@@ -172,6 +172,50 @@ _DEADLOCK_SECTION_RE = re.compile(
     r"LATEST DETECTED DEADLOCK\s*\n-+\n(.*?)(?:\n-{4,}|\Z)", re.DOTALL
 )
 
+# The line immediately preceding a deadlock transaction's statement. The server
+# names itself here, so both spellings must match: MySQL 8.4 writes "MySQL
+# thread id 30, ..." and MariaDB 11.8 writes "MariaDB thread id 6, ...".
+_THREAD_ID_RE = re.compile(r"(?:MySQL|MariaDB) thread id\b")
+
+
+def _deadlock_transaction_query(body: str) -> str:
+    """The SQL of one deadlock transaction, without InnoDB's own bookkeeping.
+
+    Real ``SHOW ENGINE INNODB STATUS`` output puts several metadata lines between
+    the ``TRANSACTION`` header and the statement::
+
+        TRANSACTION 1820, ACTIVE 4 sec starting index read
+        mysql tables in use 1, locked 1
+        LOCK WAIT 3 lock struct(s), heap size 1128, 2 row lock(s), ...
+        MySQL thread id 30, OS thread handle ..., query id 106 ... updating
+        UPDATE accounts SET balance=balance-1 WHERE id=2
+
+    Taking every line before the lock listing folded that bookkeeping into a
+    field named ``query``, so a caller (or a model quoting it back) saw
+    "mysql tables in use 1, locked 1 LOCK WAIT 3 lock struct(s), heap size 1128
+    ... UPDATE accounts ...". The statement always follows the thread-id line,
+    so that line is the anchor — and **MariaDB spells it "MariaDB thread id"
+    where MySQL writes "MySQL thread id"** (measured on 11.8 and 8.4), so
+    anchoring on the MySQL spelling alone sent MariaDB down the fallback, which
+    then reported "MariaDB thread id 6, OS thread handle ..., query id 12
+    localhost root Updating UPDATE ..." as the query. The prefix-skipping
+    fallback is kept for output that carries no thread-id line at all.
+    """
+    lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
+    stop = ("RECORD LOCKS", "TABLE LOCK")
+    anchor = next((i for i, ln in enumerate(lines) if _THREAD_ID_RE.match(ln)), None)
+    if anchor is not None:
+        candidates = lines[anchor + 1:]
+    else:  # no thread-id line — skip the known bookkeeping prefixes instead
+        skip = ("mysql tables in use", "LOCK WAIT", "lock struct(s)")
+        candidates = [ln for ln in lines[1:] if not ln.startswith(skip)]
+    query_lines: list[str] = []
+    for ln in candidates:
+        if ln.startswith(stop):
+            break
+        query_lines.append(ln)
+    return " ".join(query_lines)[:500]
+
 
 def parse_last_deadlock(innodb_status: str) -> dict | None:
     """Extract the LATEST DETECTED DEADLOCK section from SHOW ENGINE INNODB STATUS.
@@ -186,26 +230,19 @@ def parse_last_deadlock(innodb_status: str) -> dict | None:
         return None
     section = m.group(1)
     first_line = section.strip().splitlines()[0].strip() if section.strip() else ""
-    transactions: list[dict] = []
-    for tm in re.finditer(
-        r"\*\*\* \((\d+)\) TRANSACTION:\s*\n(.*?)(?=\n\*\*\*|\Z)", section, re.DOTALL
-    ):
-        body = tm.group(2)
-        lines = [ln.strip() for ln in body.splitlines() if ln.strip()]
-        query_lines: list[str] = []
-        for ln in lines[1:]:
-            if ln.startswith(("RECORD LOCKS", "TABLE LOCK", "MySQL thread id")):
-                if ln.startswith("MySQL thread id"):
-                    continue
-                break
-            query_lines.append(ln)
-        transactions.append({
-            "index": int(tm.group(1)),
-            "query": " ".join(query_lines)[:500],
-        })
+    # MySQL 8.x stamps the deadlock line as "<timestamp> <thread handle>"; the
+    # trailing handle is not part of the time and made detectedAt unparseable.
+    stamp_m = re.match(r"(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})", first_line)
+    detected_at = stamp_m.group(1) if stamp_m else first_line[:64]
+    transactions = [
+        {"index": int(tm.group(1)), "query": _deadlock_transaction_query(tm.group(2))}
+        for tm in re.finditer(
+            r"\*\*\* \((\d+)\) TRANSACTION:\s*\n(.*?)(?=\n\*\*\*|\Z)", section, re.DOTALL
+        )
+    ]
     victim_m = re.search(r"\*\*\* WE ROLL BACK TRANSACTION \((\d+)\)", section)
     return {
-        "detectedAt": first_line[:64],
+        "detectedAt": detected_at,
         "victim": int(victim_m.group(1)) if victim_m else None,
         "transactions": transactions,
         "raw": section.strip()[:4000],

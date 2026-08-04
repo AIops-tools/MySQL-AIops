@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **The deadlock parser returned InnoDB's bookkeeping as the query.** `lastDeadlock.transactions[].query` began "mysql tables in use 1, locked 1 LOCK WAIT 3 lock struct(s), heap size 1128, ..." before reaching the actual statement, because every line between the `TRANSACTION` header and the lock listing was folded into a field named `query` — text a model would quote back as SQL. The statement is now taken from after the thread-id line. The unit fixture had been **idealised** (statement directly under the header, a shape no real server emits), which is why the parser passed without ever having seen real `SHOW ENGINE INNODB STATUS` output; it is now verbatim real output from MySQL 8.4.11 and MariaDB 11.8.
+- **The same field was wrong on MariaDB for a second reason**: MariaDB writes `MariaDB thread id` where MySQL writes `MySQL thread id`, so a MySQL-only anchor sent MariaDB down the fallback path and reported the entire thread-id line ("MariaDB thread id 6, OS thread handle …, query id 12 localhost root Updating UPDATE …") as the query. Both spellings are matched now, verified live on both servers.
+- **`lastDeadlock.detectedAt` was not a timestamp.** MySQL stamps the deadlock line as `<timestamp> <thread handle>` (MariaDB as `<timestamp> <hex handle>`), and the whole string was returned, so `detectedAt` was "2026-08-04 05:25:29 136464230757952" — unparseable as a time. Only the timestamp is returned now.
+
 ## v0.6.0 — 2026-08-03
 
 ### Fixed

@@ -35,9 +35,16 @@ models the driver's real types.
 
 ## Not yet live-verified ⚠️
 
-- **MariaDB** — the flavor branch (`SHOW SLAVE STATUS`,
-  `information_schema.innodb_lock_waits`) is unit-tested only. This is now the
-  largest remaining gap in this repo.
+- **MariaDB** — partially closed. The **`information_schema.innodb_lock_waits`
+  branch is live-verified** (2026-08-04, real MariaDB 11.8.8): flavor detected
+  as `mariadb`, a genuinely contended row lock produced the right wait-for edge
+  (blocked thread 11 on blocking thread 10, matching the server's own
+  `innodb_lock_waits`), the RCA named the root blocker with its real wait, and
+  the MySQL-only columns came back **`null` rather than `""`** — the branch
+  reports "this flavour cannot supply it", not "it is empty". A real MariaDB
+  deadlock was parsed correctly too (and exposed the `MariaDB thread id`
+  spelling bug, below). **`SHOW SLAVE STATUS` on a real MariaDB replica is still
+  unverified in this file** — replication was exercised on MySQL only.
 - ~~**Replication** (`replication_lag_rca`, `repl status` against a real replica)~~
   — **closed 2026-08-03 against a real MySQL 8.4.11 primary/replica pair with
   GTID replication. No defects found.** Recorded because a clean result is
@@ -55,5 +62,30 @@ models the driver's real types.
     duplicate-key/schema divergence as the cause, and advised repairing rather
     than skipping the event. `secondsBehindSource` came back **null, not 0** —
     the difference between "no lag" and "unknown while stopped".
-- **Lock waits** (`lock_wait_rca`) — needs deliberately contended transactions.
+- ~~**Lock waits** (`lock_wait_rca`) — needs deliberately contended transactions.~~
+  **Verified 2026-08-04 on BOTH flavours** with genuinely contended
+  transactions: a real row-lock wait (MySQL 8.4.11) and a real deadlock produced
+  on MySQL 8.4.11 **and** MariaDB 11.8.
+  - The wait-for read matched ground truth exactly (blocked thread 21 waiting on
+    thread 20, matching `performance_schema.data_lock_waits`), and the RCA named
+    the right root blocker with its real 47-second wait. The MySQL-only columns
+    are genuinely populated (`objectSchema: labdb`, `objectName: accounts`) —
+    the data the MariaDB branch cannot supply, so the flavour split is real and
+    not just two code paths returning the same thing.
+  - **Two defects were found in the deadlock parser, which had never been run
+    against real `SHOW ENGINE INNODB STATUS` output.** (1) `transactions[].query`
+    carried InnoDB's own bookkeeping — it began "mysql tables in use 1, locked 1
+    LOCK WAIT 3 lock struct(s), heap size 1128, ..." before reaching the actual
+    UPDATE — because every line before the lock listing was folded into a field
+    named `query`. (2) `detectedAt` carried the trailing thread handle
+    ("2026-08-04 05:25:29 136464230757952"), so it was not a parseable
+    timestamp. The unit fixture was **idealised**: it put the statement directly
+    under the TRANSACTION header, a shape no real server emits, which is why the
+    parser passed. Fixed by anchoring on the thread-id line and extracting the
+    timestamp; the fixture is now verbatim real output.
+  - **The first fix was MySQL-only and MariaDB caught it**: MariaDB writes
+    `MariaDB thread id`, MySQL writes `MySQL thread id`, so anchoring on the
+    MySQL spelling sent MariaDB down the fallback path and reported the entire
+    thread-id line as the query. Both spellings now match, verified live on
+    both servers.
 - Privilege-degradation paths and `performance_schema = OFF` behaviour.

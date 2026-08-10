@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 — 2026-08-10
 
 ### Fixed
 - **The deadlock parser returned InnoDB's bookkeeping as the query.** `lastDeadlock.transactions[].query` began "mysql tables in use 1, locked 1 LOCK WAIT 3 lock struct(s), heap size 1128, ..." before reaching the actual statement, because every line between the `TRANSACTION` header and the lock listing was folded into a field named `query` — text a model would quote back as SQL. The statement is now taken from after the thread-id line. The unit fixture had been **idealised** (statement directly under the header, a shape no real server emits), which is why the parser passed without ever having seen real `SHOW ENGINE INNODB STATUS` output; it is now verbatim real output from MySQL 8.4.11 and MariaDB 11.8.

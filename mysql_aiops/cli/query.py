@@ -10,6 +10,7 @@ import typer
 from mysql_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    checked,
     cli_errors,
     console,
     double_confirm,
@@ -82,4 +83,4 @@ def query_reset(target: TargetOption = None, dry_run: DryRunOption = False) -> N
         )
         return
     double_confirm("reset statement digest stats on", "this target")
-    console.print_json(json.dumps(gov.reset_query_stats(target=target), default=str))
+    console.print_json(json.dumps(checked(gov.reset_query_stats(target=target)), default=str))

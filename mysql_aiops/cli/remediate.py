@@ -10,6 +10,7 @@ import typer
 from mysql_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    checked,
     cli_errors,
     console,
     double_confirm,
@@ -43,7 +44,7 @@ def remediate_kill(
         return
     double_confirm("kill session", str(session_id))
     console.print_json(json.dumps(
-        gov.kill_session(session_id=session_id, target=target), default=str))
+        checked(gov.kill_session(session_id=session_id, target=target)), default=str))
 
 
 @remediate_app.command("kill-query")
@@ -64,7 +65,7 @@ def remediate_kill_query(
         return
     double_confirm("kill query on session", str(session_id))
     console.print_json(json.dumps(
-        gov.kill_query(session_id=session_id, target=target), default=str))
+        checked(gov.kill_query(session_id=session_id, target=target)), default=str))
 
 
 @remediate_app.command("optimize")
@@ -83,7 +84,9 @@ def remediate_optimize(
             operation="optimize_table", api_call=f"OPTIMIZE TABLE {table}")
         return
     double_confirm("OPTIMIZE TABLE", table)
-    console.print_json(json.dumps(gov.optimize_table(table=table, target=target), default=str))
+    console.print_json(
+        json.dumps(checked(gov.optimize_table(table=table, target=target)), default=str)
+    )
 
 
 @remediate_app.command("analyze-table")
@@ -102,7 +105,9 @@ def remediate_analyze(
             operation="analyze_table", api_call=f"ANALYZE TABLE {table}")
         return
     double_confirm("ANALYZE TABLE", table)
-    console.print_json(json.dumps(gov.analyze_table(table=table, target=target), default=str))
+    console.print_json(
+        json.dumps(checked(gov.analyze_table(table=table, target=target)), default=str)
+    )
 
 
 @remediate_app.command("create-index")
@@ -130,8 +135,8 @@ def remediate_create_index(
                         "name": would.get("name", name), "unique": unique})
         return
     double_confirm("create index on", table)
-    result = gov.create_index(table=table, columns=columns, name=name, unique=unique,
-                              target=target)
+    result = checked(gov.create_index(table=table, columns=columns, name=name, unique=unique,
+                              target=target))
     console.print_json(json.dumps(result, default=str))
 
 
@@ -153,7 +158,7 @@ def remediate_drop_index(
         return
     double_confirm("drop index", f"{name} on {table}")
     console.print_json(json.dumps(
-        gov.drop_index(table=table, name=name, target=target), default=str))
+        checked(gov.drop_index(table=table, name=name, target=target)), default=str))
 
 
 @remediate_app.command("set")
@@ -177,4 +182,4 @@ def remediate_set(
         return
     double_confirm(f"SET GLOBAL {name} =", value)
     console.print_json(json.dumps(
-        gov.set_global_variable(name=name, value=value, target=target), default=str))
+        checked(gov.set_global_variable(name=name, value=value, target=target)), default=str))

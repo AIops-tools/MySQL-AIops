@@ -37,6 +37,13 @@ def _normalize_replica_row(row: dict) -> dict:
         "lastSqlErrno": _pick(row, "Last_SQL_Errno"),
         "retrievedGtidSet": opt(_pick(row, "Retrieved_Gtid_Set"), 200),
         "executedGtidSet": opt(_pick(row, "Executed_Gtid_Set"), 200),
+        # MariaDB has neither GTID column above, but it does say per channel
+        # whether GTID is in use and where it has read to. Without these, a
+        # MariaDB replica reported null for every GTID field — identical output
+        # for "not using GTID" and "using GTID, reported elsewhere". Measured on
+        # MariaDB 11.8.8: Using_Gtid: Slave_Pos, Gtid_IO_Pos: 0-1-6.
+        "usingGtid": opt(_pick(row, "Using_Gtid"), 32),
+        "gtidIoPos": opt(_pick(row, "Gtid_IO_Pos"), 200),
         "relayLogSpace": _pick(row, "Relay_Log_Space"),
         "sqlDelay": _pick(row, "SQL_Delay"),
         "channelName": opt(_pick(row, "Channel_Name"), 128),
@@ -77,7 +84,14 @@ def binlog_status(conn: Any) -> dict:
         return opt(row.get("Value"), 200)
 
     log_bin = _var("log_bin")
-    gtid_mode = _var("gtid_mode")  # empty on MariaDB (uses gtid_current_pos)
+    gtid_mode = _var("gtid_mode")  # absent on MariaDB — see gtidNote below
+    # MariaDB has no gtid_mode switch: GTID is always available, and whether a
+    # given replica uses it is per-channel (`Using_Gtid`). Reporting only the
+    # absent MySQL variable left a MariaDB caller unable to tell "GTID is off"
+    # from "this flavour keeps it under other names" — both came back null.
+    # Measured on MariaDB 11.8.8, which does expose these.
+    gtid_current_pos = _var("gtid_current_pos")
+    gtid_strict_mode = _var("gtid_strict_mode")
     server_id = _var("server_id")
     binlog_format = _var("binlog_format")
     expire = _var("binlog_expire_logs_seconds") or _var("expire_logs_days")
@@ -103,9 +117,20 @@ def binlog_status(conn: Any) -> dict:
         "serverId": server_id,
         "binlogFormat": opt(binlog_format, 32),
         "gtidMode": opt(gtid_mode, 32),
+        "gtidCurrentPos": opt(gtid_current_pos, 200),
+        "gtidStrictMode": opt(gtid_strict_mode, 32),
         "binlogRetention": opt(expire, 32),
         "binlogCount": len(binlogs),
         "binlogTotalBytes": total_bytes,
         "downstreamReplicaCount": len(replica_threads),
         "downstreamReplicas": replica_threads,
+        "gtidNote": (
+            "gtidMode is a MySQL-only variable; MariaDB has no such switch, so a "
+            "null gtidMode on MariaDB does NOT mean GTID is off. Read "
+            "gtidCurrentPos (and each channel's usingGtid from repl status) "
+            "instead."
+            if gtid_mode is None
+            else "gtidMode is the MySQL global switch; gtidCurrentPos/"
+                 "gtidStrictMode are MariaDB-only and are null here."
+        ),
     }

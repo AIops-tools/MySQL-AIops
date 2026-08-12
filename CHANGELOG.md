@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.0 — 2026-08-12
+
+### Fixed
+- **On MariaDB every GTID field came back null, so a GTID-based replica looked identical to one not using GTID.** MariaDB has no `gtid_mode` variable and no `Executed_Gtid_Set` / `Retrieved_Gtid_Set` columns — which the code knew; what it did not do was report the fields MariaDB *does* have. Measured on a real MariaDB 11.8.8 replica switched between both modes: with `MASTER_USE_GTID=slave_pos` the server reported `Using_Gtid: Slave_Pos` and `Gtid_IO_Pos: 0-1-6`, and this tool still said nothing at all. Whether a replica is GTID-based decides whether it can be repointed safely, so a null reading as "not in use" is a wrong answer to a first-order question.
+  - `repl binlog` now also reports `gtidCurrentPos` and `gtidStrictMode` (MariaDB), plus a `gtidNote` naming which fields belong to which flavour, so a null `gtidMode` on MariaDB cannot be read as "GTID is off".
+  - `repl status` now also reports `usingGtid` and `gtidIoPos` per channel.
+  - MySQL's answer is unchanged, verified against a real MySQL 8.4.11 with `gtid_mode=ON`: `gtidMode: "ON"` and the MariaDB-only fields null.
+
+### Verified
+- **`SHOW SLAVE STATUS` against a real MariaDB replica** — the last remaining gap in `docs/VERIFICATION.md`; replication had only ever been exercised on MySQL. Against a real MariaDB 11.8.8 primary/replica pair, `doctor` identified each end correctly (`role: replica (seconds behind source: 0)` vs `primary/standalone`) and `repl status` matched the server's own output field for field, with the MySQL-only columns null rather than `""`.
+- **A genuinely broken replica**: with the applier stopped on `Table 'shop.orders' doesn't exist`, `lastSqlErrno: 1146` and the full message matched MariaDB exactly, `analyze replication` named the cause and the right action, and a stopped SQL thread correctly produced `secondsBehindSource: null` rather than `0`.
+
 ## v0.8.0 — 2026-08-10
 
 ### Fixed

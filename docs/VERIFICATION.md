@@ -43,8 +43,17 @@ models the driver's real types.
   the MySQL-only columns came back **`null` rather than `""`** — the branch
   reports "this flavour cannot supply it", not "it is empty". A real MariaDB
   deadlock was parsed correctly too (and exposed the `MariaDB thread id`
-  spelling bug, below). **`SHOW SLAVE STATUS` on a real MariaDB replica is still
-  unverified in this file** — replication was exercised on MySQL only.
+  spelling bug, below). **`SHOW SLAVE STATUS` on a real MariaDB replica is now verified**
+  (2026-08-12, real MariaDB 11.8.8 primary/replica pair): `doctor` identified
+  each end correctly, `repl status` matched the server's own output field for
+  field, and a genuinely broken applier (`Table 'shop.orders' doesn't exist`)
+  surfaced as `lastSqlErrno: 1146` with the full message and the right RCA cause
+  — with `secondsBehindSource: null` rather than `0` while the SQL thread was
+  stopped. **That run also found a real defect**: on MariaDB every GTID field was
+  null, so a replica running `Using_Gtid: Slave_Pos` / `Gtid_IO_Pos: 0-1-6` was
+  indistinguishable from one not using GTID. `usingGtid` / `gtidIoPos` (per
+  channel) and `gtidCurrentPos` / `gtidStrictMode` (global) are now reported, and
+  MySQL 8.4.11 was re-checked to confirm its own answer did not move.
 - ~~**Replication** (`replication_lag_rca`, `repl status` against a real replica)~~
   — **closed 2026-08-03 against a real MySQL 8.4.11 primary/replica pair with
   GTID replication. No defects found.** Recorded because a clean result is

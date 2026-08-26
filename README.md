@@ -97,6 +97,21 @@ live from a configured target. `top_queries`/`slow_query_rca` require
 
 ## Quick start
 
+### As a Claude Code plugin
+
+One install gives an agent both the skill and the MCP server:
+
+```
+/plugin marketplace add AIops-tools/marketplace
+/plugin install mysql-aiops@aiops-tools
+```
+
+The MCP server is fetched with [uv](https://docs.astral.sh/uv/) and pinned to the
+package version this plugin declares, so an audit row can be traced back to the
+code that wrote it. Credentials are still configured with `mysql-aiops init` — see below.
+
+### As a CLI or standalone MCP server
+
 ```bash
 uv tool install mysql-aiops             # or: pipx install mysql-aiops
 mysql-aiops init                        # wizard: add a target + store the password (encrypted)

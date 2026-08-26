@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mysql-aiops": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mysql-aiops==0.9.0",
+        "mysql-aiops-mcp"
+      ]
+    }
+  }
+}

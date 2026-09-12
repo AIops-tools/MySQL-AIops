@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "mysql-aiops",
   "displayName": "MySQL AIops",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Governed MySQL/MariaDB DBA ops: slow-query, lock-wait, replication & fragmentation RCA; 35 tools.",
   "author": {
     "name": "Wei Zhou",

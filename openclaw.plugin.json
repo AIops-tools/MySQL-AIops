@@ -1,0 +1,24 @@
+{
+  "id": "mysql-aiops",
+  "name": "MySQL AIops",
+  "description": "Governed MySQL/MariaDB DBA ops: slow-query, lock-wait, replication & fragmentation RCA; 35 tools.",
+  "skills": [
+    "./skills"
+  ],
+  "mcpServers": {
+    "mysql-aiops": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mysql-aiops==0.10.0",
+        "mysql-aiops-mcp"
+      ]
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

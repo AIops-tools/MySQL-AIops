@@ -71,6 +71,8 @@ openclaw plugins install clawhub:@aiops-tools/mysql-aiops
 openclaw skills info mysql-aiops          # expect: Visible to model: yes
 ```
 
+Needs `uvx` on `PATH`: the MCP server is fetched with uv, pinned to this release.
+
 ## When to Use This Skill
 
 - Triage a server (`overview`): version + flavor, uptime, connection headroom, sessions by command, longest query, most fragmented table, replica role

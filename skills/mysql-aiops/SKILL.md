@@ -64,6 +64,13 @@ mysql-aiops init       # interactive wizard: connection + encrypted password
 mysql-aiops doctor     # connectivity + flavor + performance_schema + replica role
 ```
 
+Or as an OpenClaw plugin, which installs this skill and its MCP server together:
+
+```bash
+openclaw plugins install clawhub:@aiops-tools/mysql-aiops
+openclaw skills info mysql-aiops          # expect: Visible to model: yes
+```
+
 ## When to Use This Skill
 
 - Triage a server (`overview`): version + flavor, uptime, connection headroom, sessions by command, longest query, most fragmented table, replica role

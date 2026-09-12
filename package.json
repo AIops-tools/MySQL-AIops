@@ -1,6 +1,6 @@
 {
   "name": "@aiops-tools/mysql-aiops",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Governed MySQL/MariaDB DBA ops: slow-query, lock-wait, replication & fragmentation RCA; 35 tools.",
   "private": true,
   "license": "MIT",

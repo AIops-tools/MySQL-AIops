@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 
-from mysql_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from mysql_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 
 @cli_errors
+@audited
 def overview_cmd(target: TargetOption = None) -> None:
     """One-shot server health: version+flavor, connections, long queries, fragmentation."""
     from mysql_aiops.ops import overview as ops

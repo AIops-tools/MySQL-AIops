@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from mysql_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from mysql_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 table_app = typer.Typer(
     name="table",
@@ -18,6 +18,7 @@ table_app = typer.Typer(
 
 @table_app.command("sizes")
 @cli_errors
+@audited
 def table_sizes(
     limit: Annotated[int, typer.Option("--limit", help="Rows to return")] = 20,
     target: TargetOption = None,
@@ -37,6 +38,7 @@ def table_sizes(
 
 @table_app.command("fragmentation")
 @cli_errors
+@audited
 def table_fragmentation(
     limit: Annotated[int, typer.Option("--limit", help="Rows to return")] = 50,
     target: TargetOption = None,
@@ -56,6 +58,7 @@ def table_fragmentation(
 
 @table_app.command("status")
 @cli_errors
+@audited
 def table_status(
     limit: Annotated[int, typer.Option("--limit", help="Rows to return")] = 50,
     target: TargetOption = None,

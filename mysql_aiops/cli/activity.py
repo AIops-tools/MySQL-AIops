@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from mysql_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from mysql_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 activity_app = typer.Typer(
     name="activity",
@@ -18,6 +18,7 @@ activity_app = typer.Typer(
 
 @activity_app.command("sessions")
 @cli_errors
+@audited
 def activity_sessions(
     no_sleeping: Annotated[
         bool, typer.Option("--no-sleeping", help="Hide sessions in command=Sleep")
@@ -34,6 +35,7 @@ def activity_sessions(
 
 @activity_app.command("long")
 @cli_errors
+@audited
 def activity_long(
     min_seconds: Annotated[int, typer.Option("--min-seconds", help="Minimum age")] = 60,
     target: TargetOption = None,
@@ -48,6 +50,7 @@ def activity_long(
 
 @activity_app.command("transactions")
 @cli_errors
+@audited
 def activity_transactions(target: TargetOption = None) -> None:
     """List open InnoDB transactions, oldest first."""
     from mysql_aiops.ops import activity as ops
@@ -58,6 +61,7 @@ def activity_transactions(target: TargetOption = None) -> None:
 
 @activity_app.command("lock-waits")
 @cli_errors
+@audited
 def activity_lock_waits(target: TargetOption = None) -> None:
     """List InnoDB wait-for edges (blocked -> blocking session)."""
     from mysql_aiops.ops import activity as ops

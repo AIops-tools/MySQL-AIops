@@ -6,7 +6,7 @@ import json
 
 import typer
 
-from mysql_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from mysql_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 repl_app = typer.Typer(
     name="repl",
@@ -17,6 +17,7 @@ repl_app = typer.Typer(
 
 @repl_app.command("status")
 @cli_errors
+@audited
 def repl_status(target: TargetOption = None) -> None:
     """Replica thread state and lag (flavor-branched)."""
     from mysql_aiops.ops import replication as ops
@@ -27,6 +28,7 @@ def repl_status(target: TargetOption = None) -> None:
 
 @repl_app.command("binlog")
 @cli_errors
+@audited
 def repl_binlog(target: TargetOption = None) -> None:
     """Binary-log configuration, GTID mode and downstream replicas."""
     from mysql_aiops.ops import replication as ops

@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from mysql_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from mysql_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 analyze_app = typer.Typer(
     name="analyze",
@@ -18,6 +18,7 @@ analyze_app = typer.Typer(
 
 @analyze_app.command("slow-query")
 @cli_errors
+@audited
 def analyze_slow_query(
     explain_sql: Annotated[str | None, typer.Option("--explain", help="SQL to EXPLAIN")] = None,
     target: TargetOption = None,
@@ -34,6 +35,7 @@ def analyze_slow_query(
 
 @analyze_app.command("lock-waits")
 @cli_errors
+@audited
 def analyze_lock_waits(target: TargetOption = None) -> None:
     """Build the lock-wait chain, name the root blocker, parse the last deadlock."""
     from mysql_aiops.ops import activity, analysis
@@ -48,6 +50,7 @@ def analyze_lock_waits(target: TargetOption = None) -> None:
 
 @analyze_app.command("replication")
 @cli_errors
+@audited
 def analyze_replication(target: TargetOption = None) -> None:
     """Root-cause replica lag / stopped threads."""
     from mysql_aiops.ops import analysis, replication
@@ -59,6 +62,7 @@ def analyze_replication(target: TargetOption = None) -> None:
 
 @analyze_app.command("fragmentation")
 @cli_errors
+@audited
 def analyze_fragmentation(target: TargetOption = None) -> None:
     """Rank tables by reclaimable data_free into OPTIMIZE candidates."""
     from mysql_aiops.ops import analysis, tables

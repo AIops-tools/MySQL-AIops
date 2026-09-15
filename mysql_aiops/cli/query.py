@@ -10,6 +10,7 @@ import typer
 from mysql_aiops.cli._common import (
     DryRunOption,
     TargetOption,
+    audited,
     checked,
     cli_errors,
     console,
@@ -27,6 +28,7 @@ query_app = typer.Typer(
 
 @query_app.command("top")
 @cli_errors
+@audited
 def query_top(
     order_by: Annotated[
         str,
@@ -53,6 +55,7 @@ def query_top(
 
 @query_app.command("explain")
 @cli_errors
+@audited
 def query_explain(
     sql: Annotated[str, typer.Argument(help="A single SQL statement to EXPLAIN")],
     target: TargetOption = None,

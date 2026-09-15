@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from mysql_aiops.cli._common import TargetOption, cli_errors, console, get_connection
+from mysql_aiops.cli._common import TargetOption, audited, cli_errors, console, get_connection
 
 server_app = typer.Typer(
     name="server",
@@ -18,6 +18,7 @@ server_app = typer.Typer(
 
 @server_app.command("version")
 @cli_errors
+@audited
 def server_version(target: TargetOption = None) -> None:
     """Server version, flavor (mysql/mariadb), uptime and read-only state."""
     from mysql_aiops.ops import server as ops
@@ -28,6 +29,7 @@ def server_version(target: TargetOption = None) -> None:
 
 @server_app.command("variables")
 @cli_errors
+@audited
 def server_variables(
     pattern: Annotated[str | None, typer.Argument(help="Name substring filter")] = None,
     target: TargetOption = None,
@@ -41,6 +43,7 @@ def server_variables(
 
 @server_app.command("status")
 @cli_errors
+@audited
 def server_status(
     pattern: Annotated[str | None, typer.Argument(help="Name substring filter")] = None,
     target: TargetOption = None,
@@ -54,6 +57,7 @@ def server_status(
 
 @server_app.command("databases")
 @cli_errors
+@audited
 def server_databases(target: TargetOption = None) -> None:
     """User schemas with table count and data/index size."""
     from mysql_aiops.ops import server as ops
@@ -64,6 +68,7 @@ def server_databases(target: TargetOption = None) -> None:
 
 @server_app.command("engines")
 @cli_errors
+@audited
 def server_engines(target: TargetOption = None) -> None:
     """Storage engines and which is the default."""
     from mysql_aiops.ops import server as ops
@@ -74,6 +79,7 @@ def server_engines(target: TargetOption = None) -> None:
 
 @server_app.command("connections")
 @cli_errors
+@audited
 def server_connections(target: TargetOption = None) -> None:
     """Connection counters vs max_connections."""
     from mysql_aiops.ops import server as ops

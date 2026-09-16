@@ -20,7 +20,7 @@ get a read-only setup.
 | "Never write SQL that modifies data" | The tool exposes no arbitrary-SQL surface at all. Every statement is built from a fixed template; identifiers are validated against a strict charset and backtick-quoted, and values are always bound as query parameters. `explain_query` runs `EXPLAIN`, not your statement. |
 | "Don't invent a value when a field is missing" | A NULL column comes back as `null`, never as `""`. A sleeping session's `query` is `null` (it is running nothing), not blank; MariaDB's absent `gtid_mode` is `null`, not `""`. |
 | "Tell me if the output was cut off" | `top_queries`, `table_sizes`, `table_fragmentation` and `table_status` return `{"statements"/"tables": [...], "returned": N, "limit": L, "truncated": true/false}`. Truncation is measured — one extra row is requested — not guessed from a length coincidence. |
-| "Make it show the number it judged on" | Every finding cites the values that tripped it — `noIndexUsedPct`, `rowsExaminedPerSent`, `lockTimePct`, `tmpDiskTables`, `calls` and `meanTimeMs` for a statement; `ioThreadRunning`, `sqlThreadRunning` and `secondsBehindSource` for a replica — so a claim can be checked against a figure rather than taken on the model's word. `lock_wait_rca` returns no findings at all: it gives you `roots` ordered by `blockedCount` plus `worstRootId`, which names the blocker outright. |
+| "Make it show the number it judged on" | Every finding cites the values that tripped it — `noIndexUsedPct`, `rowsExaminedPerSent`, `lockTimePct`, `tmpDiskTables` and `calls` for a statement (the `worst` block additionally reports `meanTimeMs` and `totalTimeMs`, which no check is tripped by); `ioThreadRunning`, `sqlThreadRunning` and `secondsBehindSource` for a replica — so a claim can be checked against a figure rather than taken on the model's word. `lock_wait_rca` returns no findings at all: it gives you `roots` ordered by `blockedCount` plus `worstRootId`, which names the blocker outright. |
 | "Confirm before anything destructive" | `drop_index`, `kill_query`/`kill_session` and `optimize_table` require a `--dry-run`-able preview plus double confirmation at the CLI. `drop_index` captures the index's `SHOW CREATE` definition first, so the undo token can recreate it exactly. |
 | "Log what you did" | Every governed call is audited to `~/.mysql-aiops/audit.db` regardless of what the model says it did. |
 
@@ -49,12 +49,12 @@ TOOL USE
   a plausible-sounding answer.
 
 READING RESULTS
-- Findings from `slow_query_rca` and `replication_lag_rca` are NOT ordered by severity and
-  carry no rank. Weigh each finding's own numbers and say which one you acted on; never
-  treat the first as the headline.
 - Read the whole result before concluding. If a result contains a "truncated"
   field that is true, say so and re-run with a higher limit. The slowest query
   on the server may be the one just past the cut-off.
+- Findings from `slow_query_rca` and `replication_lag_rca` are NOT ordered by severity and
+  carry no rank. Weigh each finding's own numbers and say which one you acted on; never
+  treat the first as the headline.
 - A null field means the server returned NULL or had no such value. Report it
   as "not available" — never infer it. A session with a null "query" is idle,
   not running an unknown statement.

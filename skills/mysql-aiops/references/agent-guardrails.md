@@ -26,12 +26,15 @@ get a read-only setup.
 
 ## What still needs a prompt
 
-⚠️ **Do not read priority off list position.** `slow_query_rca` and `replication_lag_rca` append their `findings` in the order the checks run — the sorting inside `slow_query_rca` orders the *statements*, not the findings. No entry carries a `rank` or a
-`severity`, so nothing in the payload states which one matters most. Make the model weigh
-every entry's measured number and say which one it acted on, rather than treating the first
-one as the headline.
-
 These are model-behaviour problems the harness cannot fix from the outside.
+
+⚠️ **Do not read priority off list position.** `slow_query_rca` and `replication_lag_rca`
+append their `findings` in the order the checks run — the sorting inside `slow_query_rca`
+orders the *statements*, not the findings — and `lock_wait_rca` orders lock-root rows rather
+than findings. No finding here carries a `rank` or a `severity`, so nothing in the payload
+says which one matters most. Make the model weigh every finding's measured number and say
+which one it acted on, rather than treating the first as the headline.
+
 Copy this into your agent's system prompt:
 
 ```text

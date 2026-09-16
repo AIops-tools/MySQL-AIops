@@ -3,14 +3,16 @@
 ## Unreleased
 
 ### Fixed
-- `agent-guardrails.md` claimed `slow_query_rca`, `lock_wait_rca` and
-  `replication_lag_rca` "rank findings worst-first" and that "priority is in the
-  payload". Two of the three append their findings in the order the checks run and
-  no finding carries a `rank` or a `severity`, so neither half held. The claim sat
-  in the table headed "what the tool enforces — do not waste prompt budget on
-  these", i.e. it told operators to drop the prompt that would have compensated.
-  The docs now state what is
-  actually ordered, and warn not to read priority off list position.
+- `agent-guardrails.md` promised, in the table headed "what the tool enforces — do not
+  waste prompt budget on these", that `slow_query_rca`, `lock_wait_rca` and
+  `replication_lag_rca` "rank findings worst-first" with "priority in the payload".
+  Neither half held: the first two append findings in the order the checks run (the sort
+  inside `slow_query_rca` orders the statements it picks `worst` from), `lock_wait_rca`
+  returns no `findings` key at all, and no finding carries a `rank` or a `severity`. The
+  row now lists the values each finding actually cites, the one checkable ordering
+  (`lock_wait_rca`'s `roots`, by `blockedCount`, with `worstRootId` naming the blocker) is
+  called out as the exception, and the copyable system prompt gained a line telling the
+  model not to treat the first finding as the headline.
 
 ## v0.10.3 — 2026-09-15
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- `agent-guardrails.md` claimed `slow_query_rca`, `lock_wait_rca` and
+  `replication_lag_rca` "rank findings worst-first" and that "priority is in the
+  payload". Two of the three append their findings in the order the checks run and
+  no finding carries a `rank` or a `severity`, so neither half held. The claim sat
+  in the table headed "what the tool enforces — do not waste prompt budget on
+  these", i.e. it told operators to drop the prompt that would have compensated.
+  The docs now state what is
+  actually ordered, and warn not to read priority off list position.
+
 ## v0.10.3 — 2026-09-15
 
 ### Fixed

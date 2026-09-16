@@ -20,11 +20,16 @@ get a read-only setup.
 | "Never write SQL that modifies data" | The tool exposes no arbitrary-SQL surface at all. Every statement is built from a fixed template; identifiers are validated against a strict charset and backtick-quoted, and values are always bound as query parameters. `explain_query` runs `EXPLAIN`, not your statement. |
 | "Don't invent a value when a field is missing" | A NULL column comes back as `null`, never as `""`. A sleeping session's `query` is `null` (it is running nothing), not blank; MariaDB's absent `gtid_mode` is `null`, not `""`. |
 | "Tell me if the output was cut off" | `top_queries`, `table_sizes`, `table_fragmentation` and `table_status` return `{"statements"/"tables": [...], "returned": N, "limit": L, "truncated": true/false}`. Truncation is measured — one extra row is requested — not guessed from a length coincidence. |
-| "Preserve the ordering / tell me what's most urgent" | `slow_query_rca`, `lock_wait_rca` and `replication_lag_rca` rank findings worst-first with the measured number attached. Priority is in the payload, not implied by list position. |
+| "Make it show the number it judged on" | All three attach the measured number to every finding — the statement's `totalTimeMs`, the `blockedCount` of a lock root, `secondsBehindSource` for a replica — so a claim can be checked against a figure rather than taken on the model's word. `lock_wait_rca` also orders its lock-root **rows** worst-first by `blockedCount`. |
 | "Confirm before anything destructive" | `drop_index`, `kill_query`/`kill_session` and `optimize_table` require a `--dry-run`-able preview plus double confirmation at the CLI. `drop_index` captures the index's `SHOW CREATE` definition first, so the undo token can recreate it exactly. |
 | "Log what you did" | Every governed call is audited to `~/.mysql-aiops/audit.db` regardless of what the model says it did. |
 
 ## What still needs a prompt
+
+⚠️ **Do not read priority off list position.** `slow_query_rca` and `replication_lag_rca` append their `findings` in the order the checks run — the sorting inside `slow_query_rca` orders the *statements*, not the findings. No entry carries a `rank` or a
+`severity`, so nothing in the payload states which one matters most. Make the model weigh
+every entry's measured number and say which one it acted on, rather than treating the first
+one as the headline.
 
 These are model-behaviour problems the harness cannot fix from the outside.
 Copy this into your agent's system prompt:

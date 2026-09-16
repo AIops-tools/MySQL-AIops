@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.10.4 — 2026-09-17
 
 ### Fixed
 - `agent-guardrails.md` promised, in the table headed "what the tool enforces — do not

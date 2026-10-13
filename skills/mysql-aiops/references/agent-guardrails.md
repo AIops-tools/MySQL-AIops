@@ -35,7 +35,7 @@ finding carries a `rank` or a `severity`, so nothing in those two payloads says 
 matters most. (`lock_wait_rca` is the exception — its `roots` are ordered by `blockedCount`
 and `worstRootId` names the worst one.)
 
-Copy this into your agent's system prompt:
+Recommended setup for a local model (adapt it to your agent client):
 
 ```text
 You operate a MySQL or MariaDB server through the mysql-aiops MCP tools.

@@ -1,7 +1,7 @@
 """CLI write path — preview and confirmed write, both through governance.
 
 The CLI write commands delegate BOTH the preview and the real execution to the
-``@governed_tool`` functions in ``mcp_server.tools``. These tests drive a write
+``@governed_tool`` functions in ``mysql_aiops.mcp_server.tools``. These tests drive a write
 command past the double-confirm prompts and assert the call really went through
 the governed path (audit row on disk) — the regression test for the "CLI writes
 were unaudited" line-wide fix — and hold the ``--dry-run`` branch to the rule
@@ -56,7 +56,7 @@ def test_cli_query_reset_dry_run_writes_nothing_but_is_audited(gov_home, monkeyp
     from mysql_aiops.cli import app
 
     fake = fake_mysql()
-    import mcp_server.tools.queries as gov_queries
+    import mysql_aiops.mcp_server.tools.queries as gov_queries
 
     monkeypatch.setattr(gov_queries, "_get_connection", lambda target=None: fake)
     result = CliRunner().invoke(app, ["query", "reset", "--dry-run"])
@@ -75,7 +75,7 @@ def test_cli_remediate_drop_index_dry_run_writes_nothing_but_is_audited(
     from mysql_aiops.cli import app
 
     fake = fake_mysql()
-    import mcp_server.tools.remediation as gov_rem
+    import mysql_aiops.mcp_server.tools.remediation as gov_rem
 
     monkeypatch.setattr(gov_rem, "_get_connection", lambda target=None: fake)
     result = CliRunner().invoke(app, ["remediate", "drop-index", "orders", "idx_email",
@@ -98,7 +98,7 @@ def test_cli_remediate_kill_refused_dry_run_exits_nonzero_and_is_audited(gov_hom
     from tests.conftest import FakeMySQL
 
     fake = FakeMySQL(scalars={"CONNECTION_ID()": 7})
-    import mcp_server.tools.remediation as gov_rem
+    import mysql_aiops.mcp_server.tools.remediation as gov_rem
 
     monkeypatch.setattr(gov_rem, "_get_connection", lambda target=None: fake)
     result = CliRunner().invoke(app, ["remediate", "kill", "7", "--dry-run"])
@@ -116,7 +116,7 @@ def test_cli_query_reset_confirmed_goes_through_governance(gov_home, monkeypatch
     from mysql_aiops.cli import app
 
     fake = fake_mysql()
-    import mcp_server.tools.queries as gov_queries
+    import mysql_aiops.mcp_server.tools.queries as gov_queries
 
     monkeypatch.setattr(gov_queries, "_get_connection", lambda target=None: fake)
     result = CliRunner().invoke(app, ["query", "reset"], input="y\ny\n")
@@ -130,7 +130,7 @@ def test_cli_query_reset_aborts_without_double_confirm(gov_home, monkeypatch, fa
     from mysql_aiops.cli import app
 
     fake = fake_mysql()
-    import mcp_server.tools.queries as gov_queries
+    import mysql_aiops.mcp_server.tools.queries as gov_queries
 
     monkeypatch.setattr(gov_queries, "_get_connection", lambda target=None: fake)
     result = CliRunner().invoke(app, ["query", "reset"], input="y\nn\n")
@@ -149,7 +149,7 @@ def test_cli_remediate_optimize_confirmed_audits(gov_home, monkeypatch, fake_mys
         "OPTIMIZE TABLE": [{"Table": "t", "Op": "optimize", "Msg_type": "status",
                             "Msg_text": "OK"}],
     })
-    import mcp_server.tools.remediation as gov_rem
+    import mysql_aiops.mcp_server.tools.remediation as gov_rem
 
     monkeypatch.setattr(gov_rem, "_get_connection", lambda target=None: fake)
     result = CliRunner().invoke(app, ["remediate", "optimize", "orders"], input="y\ny\n")

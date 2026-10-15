@@ -15,13 +15,13 @@ from __future__ import annotations
 import pymysql
 import pytest
 
-from mcp_server._shared import _UNDETERMINED_ERRORS
 from mysql_aiops.config import TargetConfig
 from mysql_aiops.connection import (
     MySQLConnection,
     MySQLConnectionLostError,
     MySQLError,
 )
+from mysql_aiops.mcp_server._shared import _UNDETERMINED_ERRORS
 
 
 class _RaisingCursor:

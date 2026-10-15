@@ -70,11 +70,11 @@ def test_all_modules_import():
         "mysql_aiops.ops.overview",
         "mysql_aiops.cli", "mysql_aiops.cli._root", "mysql_aiops.cli._common",
         "mysql_aiops.cli.init", "mysql_aiops.cli.secret",
-        "mcp_server.server", "mcp_server._shared",
-        "mcp_server.tools.server", "mcp_server.tools.activity",
-        "mcp_server.tools.queries", "mcp_server.tools.indexes",
-        "mcp_server.tools.tables", "mcp_server.tools.replication",
-        "mcp_server.tools.analysis", "mcp_server.tools.remediation",
+        "mysql_aiops.mcp_server.server", "mysql_aiops.mcp_server._shared",
+        "mysql_aiops.mcp_server.tools.server", "mysql_aiops.mcp_server.tools.activity",
+        "mysql_aiops.mcp_server.tools.queries", "mysql_aiops.mcp_server.tools.indexes",
+        "mysql_aiops.mcp_server.tools.tables", "mysql_aiops.mcp_server.tools.replication",
+        "mysql_aiops.mcp_server.tools.analysis", "mysql_aiops.mcp_server.tools.remediation",
     ):
         importlib.import_module(name)
 
@@ -130,7 +130,7 @@ def test_cli_leaf_help_triggers_lazy_imports():
 
 @pytest.mark.unit
 def test_mcp_list_tools_exposes_expected_tools():
-    from mcp_server.server import mcp
+    from mysql_aiops.mcp_server.server import mcp
 
     tools = asyncio.run(mcp.list_tools())
     names = {t.name for t in tools}
@@ -139,7 +139,7 @@ def test_mcp_list_tools_exposes_expected_tools():
 
 @pytest.mark.unit
 def test_every_mcp_tool_is_governed_by_harness():
-    from mcp_server import _shared
+    from mysql_aiops.mcp_server import _shared
 
     tool_objs = _shared.mcp._tool_manager._tools
     assert EXPECTED_TOOLS <= set(tool_objs), "tool registry incomplete"
@@ -153,8 +153,8 @@ def test_every_mcp_tool_is_governed_by_harness():
 
 @pytest.mark.unit
 def test_write_tools_have_correct_risk_tiers():
-    from mcp_server.tools import queries as q
-    from mcp_server.tools import remediation as rem
+    from mysql_aiops.mcp_server.tools import queries as q
+    from mysql_aiops.mcp_server.tools import remediation as rem
 
     assert q.reset_query_stats._risk_level == "medium"
     for tool_name, expected in WRITE_RISK.items():
@@ -168,7 +168,7 @@ def test_drop_index_records_undo_from_captured_definition(monkeypatch):
     """drop_index through the harness records an inverse recreate from the
     definition captured out of SHOW CREATE TABLE."""
     import mysql_aiops.governance.undo as undo_mod
-    from mcp_server.tools import remediation as rem
+    from mysql_aiops.mcp_server.tools import remediation as rem
 
     conn = FakeMySQL({"SHOW CREATE TABLE": [
         {"Table": "orders", "Create Table": _CREATE_TABLE_DDL},
@@ -198,7 +198,7 @@ def test_drop_index_records_undo_from_captured_definition(monkeypatch):
 def test_create_index_undo_drops_created_name(monkeypatch):
     """create_index through the harness records an inverse that drops the new index."""
     import mysql_aiops.governance.undo as undo_mod
-    from mcp_server.tools import remediation as rem
+    from mysql_aiops.mcp_server.tools import remediation as rem
 
     conn = FakeMySQL()
     monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
@@ -223,7 +223,7 @@ def test_create_index_undo_drops_created_name(monkeypatch):
 def test_set_global_variable_undo_restores_prior_value(monkeypatch):
     """set_global_variable records an inverse SET GLOBAL back to the prior value."""
     import mysql_aiops.governance.undo as undo_mod
-    from mcp_server.tools import remediation as rem
+    from mysql_aiops.mcp_server.tools import remediation as rem
 
     conn = FakeMySQL({"SHOW GLOBAL VARIABLES": [
         {"Variable_name": "long_query_time", "Value": "10"},
@@ -253,8 +253,8 @@ def test_dry_run_gates_destructive_cli(monkeypatch):
     (that is how the twin's guards get to run) — what it must never do is issue
     the DROP.
     """
-    from mcp_server.tools import remediation as rem
     from mysql_aiops.cli import app
+    from mysql_aiops.mcp_server.tools import remediation as rem
 
     conn = FakeMySQL()
     monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
@@ -267,7 +267,7 @@ def test_dry_run_gates_destructive_cli(monkeypatch):
 
 @pytest.mark.unit
 def test_dry_run_mcp_write_does_not_execute(monkeypatch):
-    from mcp_server.tools import remediation as rem
+    from mysql_aiops.mcp_server.tools import remediation as rem
 
     conn = FakeMySQL()
     monkeypatch.setattr(rem, "_get_connection", lambda target=None: conn)
@@ -287,7 +287,7 @@ def test_risk_level_agrees_with_read_write_docstring_tag():
     16 such mislabels line-wide once, so it is kept even though read-only mode
     (its original motivation) is gone.
     """
-    from mcp_server import server
+    from mysql_aiops.mcp_server import server
 
     untagged, mismatched = [], []
     for name, tool in server.mcp._tool_manager._tools.items():

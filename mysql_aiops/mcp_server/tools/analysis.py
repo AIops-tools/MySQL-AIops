@@ -2,8 +2,8 @@
 
 from typing import Any, Optional
 
-from mcp_server._shared import _get_connection, mcp, tool_errors
 from mysql_aiops.governance import governed_tool
+from mysql_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from mysql_aiops.ops import activity as activity_ops
 from mysql_aiops.ops import analysis as ops
 from mysql_aiops.ops import queries as query_ops

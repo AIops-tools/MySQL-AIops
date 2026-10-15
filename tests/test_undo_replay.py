@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_server.tools import remediation as gov
+from mysql_aiops.mcp_server.tools import remediation as gov
 from mysql_aiops.ops import remediation as ops
 
 _CREATE_TABLE_DDL = (

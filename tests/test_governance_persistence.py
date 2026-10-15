@@ -135,7 +135,7 @@ def test_real_write_tool_persists_priorstate_undo(gov_home, monkeypatch, fake_my
     )
     fake = fake_mysql({"SHOW CREATE TABLE": [{"Table": "orders", "Create Table": ddl}]})
 
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     monkeypatch.setattr(gov, "_get_connection", lambda target=None: fake)
     result = gov.drop_index(table="orders", name="idx_orders_ts")

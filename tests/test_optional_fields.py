@@ -154,7 +154,7 @@ def test_table_sizes_report_truncation():
 
 @pytest.mark.unit
 def test_undo_list_envelope_measures_truncation(monkeypatch):
-    from mcp_server.tools import undo as undo_tools
+    from mysql_aiops.mcp_server.tools import undo as undo_tools
 
     rows = [
         {

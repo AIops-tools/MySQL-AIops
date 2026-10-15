@@ -1,4 +1,4 @@
-"""MCP tool wrappers (``mcp_server/tools/*``) exercised offline.
+"""MCP tool wrappers (``mysql_aiops/mcp_server/tools/*``) exercised offline.
 
 Each tool module binds ``_get_connection`` into its own namespace, so the fake
 connection is patched per-module. The governance harness audit/undo state is
@@ -17,14 +17,14 @@ import pytest
 import mysql_aiops.governance.audit as audit_mod
 import mysql_aiops.governance.policy as policy_mod
 import mysql_aiops.governance.undo as undo_mod
-from mcp_server.tools import activity as t_activity
-from mcp_server.tools import analysis as t_analysis
-from mcp_server.tools import indexes as t_indexes
-from mcp_server.tools import queries as t_queries
-from mcp_server.tools import remediation as t_remediation
-from mcp_server.tools import replication as t_replication
-from mcp_server.tools import server as t_server
-from mcp_server.tools import tables as t_tables
+from mysql_aiops.mcp_server.tools import activity as t_activity
+from mysql_aiops.mcp_server.tools import analysis as t_analysis
+from mysql_aiops.mcp_server.tools import indexes as t_indexes
+from mysql_aiops.mcp_server.tools import queries as t_queries
+from mysql_aiops.mcp_server.tools import remediation as t_remediation
+from mysql_aiops.mcp_server.tools import replication as t_replication
+from mysql_aiops.mcp_server.tools import server as t_server
+from mysql_aiops.mcp_server.tools import tables as t_tables
 from tests.conftest import FakeMySQL
 
 _CREATE_TABLE_DDL = (

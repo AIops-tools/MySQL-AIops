@@ -33,7 +33,7 @@ def guarded_conn(monkeypatch):
     ones: routing a preview through the governed twin means the twin opens a
     connection, so an unwired test would try to reach a real server.
     """
-    import mcp_server.tools.remediation as gov
+    import mysql_aiops.mcp_server.tools.remediation as gov
 
     fake = FakeMySQL(
         {"FROM information_schema.processlist": [{"id": 42, "user": "app"}],
@@ -106,7 +106,7 @@ def test_remediate_create_index_dry_run_lists_params(guarded_conn):
 def test_remediate_create_index_dry_run_banner_reports_the_governed_answer(guarded_conn):
     """The banner's columns/name come from the twin's ``wouldCreate``, not from
     the CLI re-stating its own arguments — so it cannot drift from the tool."""
-    import mcp_server.tools.remediation as gov
+    import mysql_aiops.mcp_server.tools.remediation as gov
 
     result = runner.invoke(app, [
         "remediate", "create-index", "orders", "email", "--dry-run",
@@ -136,7 +136,7 @@ def test_remediate_drop_index_dry_run_reports_an_unreachable_target(monkeypatch)
     The message is ``tool_errors``' sanitized one, not the raw OSError text:
     what matters here is that the failure surfaces as a failure at all.
     """
-    import mcp_server.tools.remediation as gov
+    import mysql_aiops.mcp_server.tools.remediation as gov
 
     def _boom(target=None):
         raise OSError("connection refused")

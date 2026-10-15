@@ -12,8 +12,8 @@ Risk tiers:
 
 from typing import Any, Optional
 
-from mcp_server._shared import _get_connection, mcp, tool_errors
 from mysql_aiops.governance import governed_tool
+from mysql_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from mysql_aiops.ops import remediation as ops
 
 # ── undo descriptors (built from the fetched before-state) ──────────────────

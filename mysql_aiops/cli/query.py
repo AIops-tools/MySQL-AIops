@@ -76,7 +76,7 @@ def query_reset(target: TargetOption = None, dry_run: DryRunOption = False) -> N
     ``@governed_tool``-wrapped MCP function, so the reset is audited on the same
     governance path as MCP calls — the preview included.
     """
-    from mcp_server.tools import queries as gov
+    from mysql_aiops.mcp_server.tools import queries as gov
 
     if dry_run:
         dry_run_preview(

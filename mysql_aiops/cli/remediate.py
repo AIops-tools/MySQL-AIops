@@ -32,7 +32,7 @@ def remediate_kill(
     dry_run: DryRunOption = False,
 ) -> None:
     """Terminate a session (no undo; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         # Through the governed call: kill_session refuses this tool's own
@@ -55,7 +55,7 @@ def remediate_kill_query(
     dry_run: DryRunOption = False,
 ) -> None:
     """Cancel a session's running statement (no undo; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         dry_run_preview(
@@ -76,7 +76,7 @@ def remediate_optimize(
     dry_run: DryRunOption = False,
 ) -> None:
     """OPTIMIZE TABLE (rebuild, reclaim data_free; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         dry_run_preview(
@@ -97,7 +97,7 @@ def remediate_analyze(
     dry_run: DryRunOption = False,
 ) -> None:
     """ANALYZE TABLE (refresh index statistics; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         dry_run_preview(
@@ -121,7 +121,7 @@ def remediate_create_index(
     dry_run: DryRunOption = False,
 ) -> None:
     """Create an index (reversible; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         preview = gov.create_index(table=table, columns=columns, name=name,
@@ -149,7 +149,7 @@ def remediate_drop_index(
     dry_run: DryRunOption = False,
 ) -> None:
     """Drop an index (reversible; captures the definition first; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         dry_run_preview(
@@ -170,7 +170,7 @@ def remediate_set(
     dry_run: DryRunOption = False,
 ) -> None:
     """SET GLOBAL a server variable (reversible; dry-run + confirm)."""
-    from mcp_server.tools import remediation as gov
+    from mysql_aiops.mcp_server.tools import remediation as gov
 
     if dry_run:
         # Through the governed call: set_global_variable refuses the

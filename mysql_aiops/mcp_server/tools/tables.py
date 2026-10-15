@@ -2,8 +2,8 @@
 
 from typing import Optional
 
-from mcp_server._shared import _get_connection, mcp, tool_errors
 from mysql_aiops.governance import governed_tool
+from mysql_aiops.mcp_server._shared import _get_connection, mcp, tool_errors
 from mysql_aiops.ops import tables as ops
 
 

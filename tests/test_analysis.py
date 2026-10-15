@@ -289,3 +289,43 @@ def test_fragmentation_needs_both_pct_and_bytes():
     ]
     out = analysis.fragmentation_analysis(tables)
     assert out["needsAttentionCount"] == 0
+
+
+# ── lock-chain root that is idle inside an open transaction ──────────────────
+
+
+def _idle_root_pairs():
+    return [
+        {"blockedId": 11, "blockingId": 7, "blockedQuery": "UPDATE t SET v=1 WHERE id=1",
+         "blockingQuery": None, "blockingState": "RUNNING", "waitSeconds": 40},
+    ]
+
+
+def test_idle_root_keeps_null_query_and_says_kill_query_cannot_help():
+    from mysql_aiops.ops import analysis as a
+
+    (root,) = a.lock_wait_rca(_idle_root_pairs())["roots"]
+    assert root["rootQuery"] is None  # not "" — there is no running statement
+    assert root["rootIdle"] is True
+    assert "kill_session(7)" in root["action"]
+    assert "nothing to stop" in root["action"]
+
+
+def test_active_root_keeps_its_statement_and_both_options():
+    from mysql_aiops.ops import analysis as a
+
+    pairs = _idle_root_pairs()
+    pairs[0]["blockingQuery"] = "UPDATE t SET v=2 WHERE id=1"
+    (root,) = a.lock_wait_rca(pairs)["roots"]
+    assert root["rootQuery"] == "UPDATE t SET v=2 WHERE id=1"
+    assert root["rootIdle"] is False
+    assert "kill_query(7)" in root["action"]
+    assert root["rootTrxState"] == "RUNNING"
+
+
+def test_injected_pair_without_query_is_unknown_not_idle():
+    from mysql_aiops.ops import analysis as a
+
+    (root,) = a.lock_wait_rca([{"blockedId": 2, "blockingId": 1}])["roots"]
+    assert root["rootIdle"] is None
+    assert "kill_query(1)" in root["action"]  # neutral: both options offered

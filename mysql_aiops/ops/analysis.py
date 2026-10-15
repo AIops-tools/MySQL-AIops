@@ -249,6 +249,21 @@ def parse_last_deadlock(innodb_status: str) -> dict | None:
     }
 
 
+def _lock_root_action(sid: int, idle: bool | None) -> str:
+    if idle:
+        return (
+            f"Session {sid} heads the chain but is not running a statement: it holds "
+            "locks from a transaction left open (often an application that did not "
+            f"commit). kill_query has nothing to stop; kill_session({sid}) rolls the "
+            "transaction back and releases the locks — confirm with its owner first."
+        )
+    return (
+        f"Session {sid} is the head of the chain — investigate its transaction; "
+        f"kill_query({sid}) to stop its statement, or kill_session({sid}) to end it "
+        "and release the locks."
+    )
+
+
 def lock_wait_rca(pairs: list[dict], innodb_status: str | None = None) -> dict:
     """[READ] Build the wait-for tree from lock-wait pairs and name the root blocker.
 
@@ -275,7 +290,9 @@ def lock_wait_rca(pairs: list[dict], innodb_status: str | None = None) -> dict:
         }
 
     children: dict[int, list[int]] = {}
-    blocking_query: dict[int, str] = {}
+    blocking_query: dict[int, str | None] = {}
+    blocking_state: dict[int, str | None] = {}
+    query_reported: dict[int, bool] = {}
     max_wait: dict[int, int] = {}
     blocked_ids: set[int] = set()
     blocking_ids: set[int] = set()
@@ -284,7 +301,13 @@ def lock_wait_rca(pairs: list[dict], innodb_status: str | None = None) -> dict:
         children.setdefault(g, []).append(b)
         blocked_ids.add(b)
         blocking_ids.add(g)
-        blocking_query.setdefault(g, e.get("blockingQuery") or "")
+        # None = no statement running, NOT an empty one: InnoDB reports a NULL
+        # trx_query for a transaction left open while the session sits idle.
+        blocking_query.setdefault(g, e.get("blockingQuery"))
+        blocking_state.setdefault(g, e.get("blockingState"))
+        # A NULL that was read means "no statement"; a key never supplied (an
+        # injected pair) means nothing is known about the statement at all.
+        query_reported.setdefault(g, "blockingQuery" in e)
         try:
             max_wait[g] = max(max_wait.get(g, 0), int(e.get("waitSeconds") or 0))
         except (TypeError, ValueError):
@@ -307,17 +330,18 @@ def lock_wait_rca(pairs: list[dict], innodb_status: str | None = None) -> dict:
     roots = []
     for sid in root_ids:
         blocked = _descendants(sid, children)
+        query = blocking_query.get(sid)
+        idle = (query is None) if query_reported.get(sid) else None
         roots.append({
             "rootId": sid,
             "blockedCount": len(blocked),
             "blockedIds": sorted(blocked),
             "maxWaitSeconds": max_wait.get(sid, 0),
-            "rootQuery": blocking_query.get(sid, ""),
-            "action": (
-                f"Session {sid} is the head of the chain — investigate its "
-                "transaction; kill_query(session_id) to stop its statement, or "
-                "kill_session(session_id) to end it and release the locks."
-            ),
+            "rootQuery": query,
+            # InnoDB trx_state: reads RUNNING even for an idle open transaction.
+            "rootTrxState": blocking_state.get(sid),
+            "rootIdle": idle,
+            "action": _lock_root_action(sid, idle),
         })
     roots.sort(key=lambda r: r["blockedCount"], reverse=True)
     return {

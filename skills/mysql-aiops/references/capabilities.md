@@ -33,7 +33,7 @@
 | `replica_status` | `SHOW REPLICA STATUS` (MariaDB: `SHOW SLAVE STATUS`) | isReplica, replicas[] {ioThreadRunning, sqlThreadRunning, secondsBehindSource, lastIo/SqlError, gtid} |
 | `binlog_status` | `SHOW BINARY LOGS` + variables + processlist | logBin, serverId, binlogFormat, gtidMode, binlogCount/TotalBytes, downstreamReplicas[] |
 | `slow_query_rca` | digest rows + EXPLAIN | worst{}, planAccessTypes[], findings[] (cited cause/action) |
-| `lock_wait_rca` | lock-wait pairs + `SHOW ENGINE INNODB STATUS` | roots[], worstRootId, deadlockSuspected, lastDeadlock{victim, transactions} |
+| `lock_wait_rca` | lock-wait pairs + `SHOW ENGINE INNODB STATUS` | roots[] (rootQuery — `null` when the root is idle inside an open transaction —, rootTrxState — InnoDB trx_state, RUNNING even when idle —, rootIdle, action), worstRootId, deadlockSuspected, lastDeadlock{victim, transactions} |
 | `replication_lag_rca` | replica status record | findings[] (IO/SQL thread stopped, lagging, intentional delay, healthy) |
 | `fragmentation_analysis` | fragmentation rows | recommendations[] (cited reasons + OPTIMIZE action) |
 

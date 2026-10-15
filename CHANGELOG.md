@@ -12,6 +12,15 @@
   level is published in `_meta` under `io.github.AIops-tools/riskLevel`. These
   are hints for the client; audit and undo are unchanged.
 
+### Fixed
+- `lock_wait_rca`: the chain root's query was turned back into `""` after the
+  read layer had correctly returned `null`. InnoDB reports a NULL statement for
+  a transaction left open while its session sits idle — the most common chain
+  root — and the action then recommended `kill_query`, which has nothing to stop.
+  `rootQuery` is now `null` in that case, each root carries `rootTrxState` and
+  `rootIdle` (`null` when the statement was never reported), and the action for an idle root points at
+  `kill_session` (which rolls the transaction back) and says why.
+
 ## v0.10.4 — 2026-09-17
 
 ### Fixed
